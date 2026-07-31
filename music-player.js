@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-19:00-v3.3.0-beauty';
+  var BUILD_TIME = '2026-08-01-20:00-v3.3.1-playfix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -890,13 +890,14 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   }
 
   function playSong(song) {
-    console.log('[播放]', song.name);
+    console.log('[播放歌曲]', song.name, 'ID:', song.id);
     STATE.currentSong = song;
     STATE.lyric = [];
     STATE.activeLyricIdx = -1;
 
     // 获取歌词
     neteaseLyric(song.id).then(function(data) {
+      console.log('[歌词响应]', data);
       STATE.lyric = parseLyric((data.lrc && data.lrc.lyric) || '');
       console.log('[歌词]', STATE.lyric.length + ' 行');
     }).catch(function(e) {
@@ -904,12 +905,43 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
 
     // 获取播放地址
-    neteaseSongUrl(song.id).then(data => {
-      var url = toHttps((data.data && data.data[0] || data).url);
-      if (!url) return console.error('[无播放地址]');
+    console.log('[请求播放地址] ID:', song.id, 'Quality:', STATE.quality);
+    neteaseSongUrl(song.id).then(function(data) {
+      console.log('[播放地址响应]', data);
+
+      // 解析 URL - 多种可能的数据格式
+      var url = null;
+      if (data.data && Array.isArray(data.data) && data.data[0]) {
+        url = data.data[0].url;
+      } else if (data.data && data.data.url) {
+        url = data.data.url;
+      } else if (data.url) {
+        url = data.url;
+      }
+
+      console.log('[解析URL]', url);
+
+      if (!url) {
+        console.error('[无播放地址] 完整响应:', JSON.stringify(data));
+        alert('无法获取播放地址，可能是VIP歌曲或版权限制');
+        return;
+      }
+
+      url = toHttps(url);
+      console.log('[最终URL]', url);
+
       STATE.audio.src = url;
-      STATE.audio.play();
+      STATE.audio.play().then(function() {
+        console.log('[播放成功]');
+      }).catch(function(e) {
+        console.error('[播放失败]', e);
+        alert('播放失败：' + e.message);
+      });
+
       updateNowPlaying();
+    }).catch(function(e) {
+      console.error('[获取播放地址失败]', e);
+      alert('获取播放地址失败：' + e.message);
     });
   }
 
@@ -2115,7 +2147,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.3.0',
+      version: '3.3.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',

@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.3.0",
-  "description": "✨ 完整美化：照抄SullyOS动画效果（浮动、漂移、闪烁、波纹、发光）",
+  "version": "3.3.1",
+  "description": "🔧 修复播放功能：完整错误处理+详细日志+多种URL格式支持",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
