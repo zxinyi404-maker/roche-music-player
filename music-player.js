@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-23:45-v1.21.1';
+  var BUILD_TIME = '2026-07-31-23:55-v1.21.2';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -4004,14 +4004,25 @@
   // 更新网易云登录 UI
   function updateNeteaseLoginUI() {
     var refs = STATE.appRefs;
-    if (!refs.neLoggedOut) return;
+    console.log('[updateNeteaseLoginUI] 开始执行');
+    console.log('[updateNeteaseLoginUI] refs.neLoggedOut:', refs.neLoggedOut);
+    if (!refs.neLoggedOut) {
+      console.log('[updateNeteaseLoginUI] refs.neLoggedOut 不存在，退出');
+      return;
+    }
     var hasLogin = (STATE.cookie || STATE.mcpToken) && STATE.userProfile;
+    console.log('[updateNeteaseLoginUI] STATE.cookie:', STATE.cookie);
+    console.log('[updateNeteaseLoginUI] STATE.userProfile:', STATE.userProfile);
+    console.log('[updateNeteaseLoginUI] hasLogin:', hasLogin);
+
     if (hasLogin) {
+      console.log('[updateNeteaseLoginUI] 显示登录状态');
       refs.neLoggedOut.style.display = 'none';
       refs.neLoggedIn.style.display = '';
       if (STATE.userProfile) {
         refs.neAvatar.src = STATE.userProfile.avatarUrl || '';
         refs.neNickname.textContent = STATE.userProfile.nickname || '用户';
+        console.log('[updateNeteaseLoginUI] 设置头像和昵称:', STATE.userProfile.nickname);
         if (STATE.userProfile.vipType > 0) {
           refs.neVipBadge.textContent = 'VIP会员';
           refs.neVipBadge.style.color = '#C20C0C';
@@ -4021,6 +4032,7 @@
         }
       }
     } else {
+      console.log('[updateNeteaseLoginUI] 显示未登录状态');
       refs.neLoggedOut.style.display = '';
       refs.neLoggedIn.style.display = 'none';
     }
@@ -4335,11 +4347,15 @@
                 STATE.cookie = 'MUSIC_U=' + musicU;
                 saveSettings();
                 console.log('[Cookie 已保存]', STATE.cookie);
+                console.log('[开始获取用户信息]');
 
                 // 获取用户信息后再更新 UI（重要！）
                 fetchUserInfo().then(function(profile) {
-                  console.log('[用户信息获取成功]', profile);
+                  console.log('[用户信息获取成功] profile:', profile);
+                  console.log('[STATE.userProfile]', STATE.userProfile);
+                  console.log('[准备更新UI]');
                   updateNeteaseLoginUI();
+                  console.log('[UI更新完成]');
                   if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
 
                   clearInterval(STATE.qrPollTimer);
@@ -4350,6 +4366,7 @@
                   }, 1500);
                 }).catch(function(err) {
                   console.error('[获取用户信息失败]', err);
+                  console.error('[即使失败也关闭弹窗]');
                   // 即使获取失败，也关闭弹窗
                   if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('登录成功，但获取用户信息失败');
                   clearInterval(STATE.qrPollTimer);

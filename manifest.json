@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.21.1",
-  "description": "🐛 修复扫码登录 - 登录成功后获取用户信息，正确更新 UI 显示",
+  "version": "1.21.2",
+  "description": "🔍 增强调试 - 每一步都输出详细日志，帮助定位登录后 UI 不更新的问题",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.21.1/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.21.2/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }
