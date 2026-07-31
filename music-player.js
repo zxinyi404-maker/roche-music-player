@@ -509,6 +509,30 @@
 
   // ==================== 导出 ====================
   if (typeof window !== 'undefined') {
-    window.RocheMusicPlayer = { init, version: BUILD_TIME };
+    window.RochePlugin.register({
+      id: 'roche-music-player',
+      name: '网易云音乐',
+      version: '2.0.3',
+      icon: '🎵',
+      apps: [{
+        id: 'netease-music',
+        name: '网易云音乐',
+        async mount(container, roche) {
+          console.log('[网易云音乐播放器 Shizuku] 初始化', BUILD_TIME);
+          STATE.roche = roche;
+          STATE.appContainer = container;
+          loadSettings();
+          initAudio();
+          createUI();
+        },
+        async unmount(container) {
+          if (STATE.audio) {
+            STATE.audio.pause();
+            STATE.audio = null;
+          }
+          container.replaceChildren();
+        }
+      }]
+    });
   }
 })();
