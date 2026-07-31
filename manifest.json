@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.16.10",
+  "version": "1.16.11",
   "description": "Fork from luyi90720-sys - 支持网易云音乐的灵动岛播放器插件",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.16.10/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.16.11/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }
