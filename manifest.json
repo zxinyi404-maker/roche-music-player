@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.17.0",
-  "description": "新增标准网易云扫码登录 API（仿 SullyOS），不再依赖第三方 MCP 服务器",
+  "version": "1.17.1",
+  "description": "✅ 标准网易云扫码登录已完成！使用自己的 Worker 后端，稳定可靠",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.17.0/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.17.1/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }

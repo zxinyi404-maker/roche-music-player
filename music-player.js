@@ -39,7 +39,7 @@
     tlyrics: [],              // 解析后的翻译歌词 [{time, text}]
     currentLyricIndex: -1,    // 当前歌词行索引
     cookie: '',               // 网易云 cookie
-    backend: 'https://456.chajianreader.cc.cd', // 后端地址（CF Worker，网易云直连接口自动转发到Vercel）
+    backend: 'https://roche-netease-api.zxinyi404.workers.dev', // Cloudflare Worker - 网易云 API 代理
     mcpBackend: 'https://ncm.chajianreader.cc.cd', // 网易云 MCP 服务器（HTTPS 直连腾讯云，扫码登录+开放平台API）
     mcpToken: '',             // MCP 服务器 accessToken（扫码登录后获取）
     defaultSource: 'netease', // 默认音源
