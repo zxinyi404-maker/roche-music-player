@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
-  "name": "音乐播放器",
-  "version": "1.21.3",
-  "description": "🔇 减少日志刷屏 - 只在有歌曲时输出 audio play 事件，避免淹没扫码登录日志",
+  "name": "网易云音乐播放器",
+  "version": "2.0.0",
+  "description": "🔥 完全重写 - 从零开始，只做网易云，完全照抄 SullyOS 实现",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.21.3/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v2.0.0/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }
