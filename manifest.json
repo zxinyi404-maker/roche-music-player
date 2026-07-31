@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.20.0",
-  "description": "🎵 完全重构网易云功能 - 搜索、播放、歌词全部改用 SullyOS API（其他音源保持不变）",
+  "version": "1.20.1",
+  "description": "🐛 调试扫码登录 - 每一步都输出详细日志，找出问题所在",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.20.0/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.20.1/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }

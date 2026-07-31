@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.20.0';
+  var BUILD_TIME = '2026-07-31-23:15-v1.20.1';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -4279,24 +4279,32 @@
 
     // 使用标准网易云 API 三步走
     // 步骤 1: 获取二维码 key
+    console.log('[扫码登录] 步骤1: 获取二维码 key...');
     loginQrKey().then(function (keyRes) {
+      console.log('[扫码登录] 步骤1 响应:', JSON.stringify(keyRes));
       var key = keyRes && (keyRes.data && keyRes.data.unikey || keyRes.unikey);
       if (!key) {
         qrPlaceholder.textContent = '获取二维码 key 失败';
         qrStatus.textContent = keyRes && keyRes.message ? keyRes.message : '请检查网络或 backend 配置';
         qrStatus.className = 'rmp-qr-status-el error';
+        console.error('[扫码登录] 步骤1 失败: 未获取到 key', keyRes);
         return;
       }
+      console.log('[扫码登录] 步骤1 成功, key:', key);
 
       // 步骤 2: 创建二维码图片
+      console.log('[扫码登录] 步骤2: 创建二维码...');
       loginQrCreate(key).then(function (createRes) {
+        console.log('[扫码登录] 步骤2 响应:', JSON.stringify(createRes));
         var qrImgData = createRes && (createRes.data && createRes.data.qrimg || createRes.qrimg);
         if (!qrImgData) {
           qrPlaceholder.textContent = '生成二维码失败';
           qrStatus.textContent = createRes && createRes.message ? createRes.message : '请检查 backend';
           qrStatus.className = 'rmp-qr-status-el error';
+          console.error('[扫码登录] 步骤2 失败: 未获取到 qrimg', createRes);
           return;
         }
+        console.log('[扫码登录] 步骤2 成功, 二维码长度:', qrImgData.length);
 
         // 显示二维码（base64 图片）
         qrImg.src = qrImgData;
@@ -4306,20 +4314,26 @@
         qrStatus.className = 'rmp-qr-status-el';
 
         // 步骤 3: 轮询检查扫码状态（照抄 SullyOS）
+        console.log('[扫码登录] 步骤3: 启动轮询...');
         STATE.qrPollTimer = setInterval(function () {
           if (!document.body.contains(overlay)) {
             clearInterval(STATE.qrPollTimer);
             STATE.qrPollTimer = null;
+            console.log('[扫码登录] 弹窗已关闭，停止轮询');
             return;
           }
 
+          console.log('[扫码登录] 轮询检查...');
           loginQrCheck(key).then(function (r) {
-            if (!r) return;
+            if (!r) {
+              console.warn('[扫码登录] 轮询返回空');
+              return;
+            }
 
             // 照抄 SullyOS: 直接取 r.code，不需要处理嵌套的 data
             var code = r.code;
 
-            console.log('[扫码状态] code:', code, '完整响应:', r);
+            console.log('[扫码状态] code:', code, '完整响应:', JSON.stringify(r));
 
             // 800: 二维码过期
             if (code === 800) {
@@ -4340,10 +4354,10 @@
             }
             // 803: 登录成功
             else if (code === 803) {
-              qrStatus.textContent = '登录成功！';
+              qrStatus.textContent = '登录成功！正在保存...';
               qrStatus.className = 'rmp-qr-status-el success';
 
-              console.log('[登录成功] 完整响应:', r);
+              console.log('[登录成功] 完整响应:', JSON.stringify(r));
 
               // 提取 cookie（照抄 SullyOS）
               var cookie = r.cookie || '';
@@ -4358,15 +4372,23 @@
                 updateNeteaseLoginUI();
                 if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
                 console.log('[Cookie 已保存]', STATE.cookie);
+
+                clearInterval(STATE.qrPollTimer);
+                STATE.qrPollTimer = null;
+                setTimeout(function() {
+                  console.log('[关闭弹窗]');
+                  overlay.remove();
+                }, 1500);
               } else {
-                qrStatus.textContent = '登录成功但未获取到 Cookie';
+                qrStatus.textContent = '登录成功但未获取到 Cookie - 请截图控制台';
                 qrStatus.className = 'rmp-qr-status-el error';
                 console.error('[Cookie 提取失败] 原始 cookie:', cookie);
+                console.error('[Cookie 提取失败] 完整响应:', r);
               }
-
-              clearInterval(STATE.qrPollTimer);
-              STATE.qrPollTimer = null;
-              setTimeout(function() { overlay.remove(); }, 1500);
+            } else {
+              // 未知状态码
+              console.warn('[未知状态码]', code, r);
+              qrStatus.textContent = '未知状态: ' + code;
             }
           }).catch(function (err) {
             console.error('[扫码轮询错误]', err);
