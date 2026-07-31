@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-04:00-v2.3.0-lyric';
+  var BUILD_TIME = '2026-08-01-05:00-v2.4.0-playlist';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -41,10 +41,14 @@
     roche: null,
     // 登录状态
     qrPollTimer: null,
-    currentView: 'main', // 'main' | 'login'
+    currentView: 'main', // 'main' | 'login' | 'playlist'
     // 歌词
     lyric: [],
-    activeLyricIdx: -1
+    activeLyricIdx: -1,
+    // 用户歌单
+    userPlaylists: [],
+    currentPlaylistSongs: [],
+    expandedPlaylistId: null
   };
 
   // ==================== 工具函数 ====================
@@ -176,6 +180,9 @@
   function loginCellphone(phone, captcha) { return neteaseCall('/login/cellphone', { phone, captcha }); }
   function neteaseSearch(keyword) { return neteaseCall('/search', { keyword, limit: 30, type: 1 }); }
   function neteaseSongUrl(id) { return neteaseCall('/song/url', { id, level: STATE.quality }); }
+  function neteaseUserPlaylist(uid) { return neteaseCall('/user/playlist', { uid, limit: 100 }); }
+  function neteasePlaylistDetail(id) { return neteaseCall('/playlist/detail', { id }); }
+  function neteaseRecommendSongs() { return neteaseCall('/recommend/songs', {}); }
 
   // ==================== 登录功能 ====================
 
@@ -187,12 +194,66 @@
       if (data && data.data && data.data.profile) {
         STATE.userProfile = data.data.profile;
         saveSettings();
+        // 登录成功后自动加载歌单
+        loadUserPlaylists();
         return data.data.profile;
       }
       return null;
     }).catch(function(e) {
       console.error('[获取用户信息失败]', e);
       return null;
+    });
+  }
+
+  // 加载用户歌单
+  function loadUserPlaylists() {
+    if (!STATE.userProfile) return;
+    neteaseUserPlaylist(STATE.userProfile.userId).then(function(data) {
+      var playlists = (data.playlist || []).map(function(p) {
+        return {
+          id: p.id,
+          name: p.name,
+          coverImgUrl: toHttps(p.coverImgUrl || ''),
+          trackCount: p.trackCount || 0,
+          creator: p.creator ? p.creator.nickname : ''
+        };
+      });
+      STATE.userPlaylists = playlists;
+      console.log('[用户歌单]', playlists.length + ' 个');
+    }).catch(function(e) {
+      console.error('[获取歌单失败]', e);
+    });
+  }
+
+  // 显示歌单列表
+  function showPlaylistView() {
+    if (!STATE.cookie || !STATE.userProfile) {
+      alert('请先登录');
+      showLoginPanel();
+      return;
+    }
+    STATE.currentView = 'playlist';
+    createUI();
+  }
+
+  // 加载歌单详情
+  function loadPlaylistDetail(playlistId) {
+    STATE.expandedPlaylistId = playlistId;
+    neteasePlaylistDetail(playlistId).then(function(data) {
+      var tracks = ((data.playlist && data.playlist.tracks) || []).map(function(t) {
+        return {
+          id: t.id,
+          name: t.name,
+          artist: (t.ar || []).map(function(a) { return a.name; }).join(' / '),
+          album: (t.al || {}).name || '',
+          pic: toHttps((t.al || {}).picUrl || ''),
+          duration: (t.dt || 0) / 1000
+        };
+      });
+      STATE.currentPlaylistSongs = tracks;
+      createUI(); // 重新渲染显示歌曲
+    }).catch(function(e) {
+      console.error('[加载歌单详情失败]', e);
     });
   }
 
@@ -952,6 +1013,150 @@
     });
   }
 
+  // ==================== 歌单视图 UI ====================
+  function createPlaylistView() {
+    var container = document.createElement('div');
+    container.style.cssText = `
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, ${C.bg} 0%, ${C.bgDeep} 100%);
+      display:flex;flex-direction:column;z-index:100;
+    `;
+
+    // 背景装饰
+    var bokeh = document.createElement('div');
+    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+    bokeh.innerHTML = `
+      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
+        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+        animation:shizuku-float 8s ease-in-out infinite"></div>
+    `;
+    container.appendChild(bokeh);
+
+    // 头部
+    var header = document.createElement('div');
+    header.className = 'shizuku-glass-strong';
+    header.style.cssText = `
+      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+    `;
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary}`;
+    backBtn.appendChild(svg('x', 16, C.primary));
+    backBtn.onclick = function() {
+      STATE.currentView = 'main';
+      STATE.expandedPlaylistId = null;
+      STATE.currentPlaylistSongs = [];
+      createUI();
+    };
+    var title = document.createElement('div');
+    title.textContent = STATE.expandedPlaylistId ? '歌单详情' : '我的歌单';
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    header.appendChild(backBtn);
+    header.appendChild(title);
+    header.appendChild(document.createElement('div')); // placeholder
+    container.appendChild(header);
+
+    // 内容区
+    var content = document.createElement('div');
+    content.className = 'shizuku-scrollbar';
+    content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
+
+    if (STATE.expandedPlaylistId && STATE.currentPlaylistSongs.length > 0) {
+      // 显示歌单歌曲
+      STATE.currentPlaylistSongs.forEach(function(song, idx) {
+        var row = document.createElement('div');
+        row.style.cssText = `
+          display:flex;align-items:center;gap:12px;padding:10px 12px;margin-bottom:6px;
+          border-radius:16px;cursor:pointer;transition:all 0.2s;
+          background:rgba(255,255,255,0.08);
+        `;
+        row.onmouseenter = function() {
+          row.style.background = 'linear-gradient(135deg, ' + C.glass + ', rgba(137,212,255,0.15))';
+          row.style.boxShadow = '0 2px 16px ' + C.glow + '15';
+        };
+        row.onmouseleave = function() {
+          row.style.background = 'rgba(255,255,255,0.08)';
+          row.style.boxShadow = 'none';
+        };
+        row.onclick = function() {
+          STATE.playlist = STATE.currentPlaylistSongs;
+          STATE.currentIndex = idx;
+          playSong(song);
+          // 回到主界面
+          STATE.currentView = 'main';
+          createUI();
+        };
+
+        var img = document.createElement('img');
+        img.src = song.pic;
+        img.style.cssText = 'width:44px;height:44px;border-radius:12px;object-fit:cover;border:1.5px solid ' + C.faint + '40';
+
+        var info = document.createElement('div');
+        info.style.cssText = 'flex:1;min-width:0';
+        info.innerHTML = `
+          <div style="font-size:13px;color:${C.text};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.name}</div>
+          <div style="font-size:11px;color:${C.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.artist}</div>
+        `;
+
+        var dur = document.createElement('div');
+        dur.textContent = formatTime(song.duration);
+        dur.style.cssText = 'font-size:10px;color:' + C.faint;
+
+        row.appendChild(img);
+        row.appendChild(info);
+        row.appendChild(dur);
+        content.appendChild(row);
+      });
+    } else {
+      // 显示歌单列表
+      if (STATE.userPlaylists.length === 0) {
+        var empty = document.createElement('div');
+        empty.textContent = '加载中...';
+        empty.style.cssText = `text-align:center;padding:40px;color:${C.muted}`;
+        content.appendChild(empty);
+      } else {
+        STATE.userPlaylists.forEach(function(pl) {
+          var card = document.createElement('div');
+          card.className = 'shizuku-glass';
+          card.style.cssText = `
+            padding:12px;border-radius:16px;margin-bottom:12px;cursor:pointer;
+            display:flex;align-items:center;gap:12px;transition:all 0.2s;
+          `;
+          card.onmouseenter = function() {
+            card.style.background = C.glass;
+            card.style.boxShadow = '0 4px 20px ' + C.glow + '20';
+          };
+          card.onmouseleave = function() {
+            card.style.background = 'rgba(255,255,255,0.22)';
+            card.style.boxShadow = 'none';
+          };
+          card.onclick = function() {
+            loadPlaylistDetail(pl.id);
+          };
+
+          var cover = document.createElement('img');
+          cover.src = pl.coverImgUrl;
+          cover.style.cssText = `width:60px;height:60px;border-radius:12px;object-fit:cover;border:1.5px solid ${C.accent}40`;
+
+          var plInfo = document.createElement('div');
+          plInfo.style.cssText = 'flex:1;min-width:0';
+          plInfo.innerHTML = `
+            <div style="font-size:14px;color:${C.text};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pl.name}</div>
+            <div style="font-size:11px;color:${C.muted};margin-top:4px">${pl.trackCount} 首 · ${pl.creator}</div>
+          `;
+
+          card.appendChild(cover);
+          card.appendChild(plInfo);
+          content.appendChild(card);
+        });
+      }
+    }
+
+    container.appendChild(content);
+    STATE.appContainer.innerHTML = '';
+    STATE.appContainer.appendChild(container);
+  }
+
   // ==================== UI 构建 ====================
   function createUI() {
     injectStyles();
@@ -959,6 +1164,11 @@
     // 根据当前视图决定渲染内容
     if (STATE.currentView === 'login') {
       createLoginPanel();
+      return;
+    }
+
+    if (STATE.currentView === 'playlist') {
+      createPlaylistView();
       return;
     }
 
@@ -1014,14 +1224,23 @@
     rightArea.style.cssText = 'display:flex;align-items:center;gap:8px';
 
     if (STATE.cookie && STATE.userProfile) {
-      // 已登录：显示用户头像
+      // 已登录：显示"我的歌单"按钮和头像
+      var playlistBtn = document.createElement('button');
+      playlistBtn.textContent = '歌单';
+      playlistBtn.style.cssText = `
+        padding:6px 12px;border-radius:12px;border:none;cursor:pointer;
+        font-size:11px;color:${C.primary};background:${C.glass};
+      `;
+      playlistBtn.onclick = showPlaylistView;
+      rightArea.appendChild(playlistBtn);
+
       var avatar = document.createElement('img');
       avatar.src = STATE.userProfile.avatarUrl || '';
       avatar.style.cssText = `
         width:28px;height:28px;border-radius:50%;cursor:pointer;
         border:1.5px solid ${C.sakura};
       `;
-      avatar.onclick = logout; // 点击头像退出登录
+      avatar.onclick = logout;
       avatar.title = '点击退出登录';
       rightArea.appendChild(avatar);
     } else {
