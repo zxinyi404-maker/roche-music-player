@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-02:00-v2.1.0-login';
+  var BUILD_TIME = '2026-08-01-03:00-v2.2.0-playmode';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -32,6 +32,7 @@
     isPlaying: false,
     volume: 0.8,
     quality: 'standard',
+    playMode: 'loop', // 'loop' | 'single' | 'shuffle'
     currentTime: 0,
     duration: 0,
     appContainer: null,
@@ -616,7 +617,14 @@
       STATE.duration = STATE.audio.duration;
       updateProgress();
     });
-    STATE.audio.addEventListener('ended', playNext);
+    STATE.audio.addEventListener('ended', function() {
+      if (STATE.playMode === 'single') {
+        STATE.audio.currentTime = 0;
+        STATE.audio.play();
+      } else {
+        playNext();
+      }
+    });
   }
 
   function playSong(song) {
@@ -633,19 +641,43 @@
 
   function playNext() {
     if (STATE.playlist.length === 0) return;
-    STATE.currentIndex = (STATE.currentIndex + 1) % STATE.playlist.length;
+    if (STATE.playMode === 'shuffle') {
+      STATE.currentIndex = Math.floor(Math.random() * STATE.playlist.length);
+    } else {
+      STATE.currentIndex = (STATE.currentIndex + 1) % STATE.playlist.length;
+    }
     playSong(STATE.playlist[STATE.currentIndex]);
   }
 
   function playPrev() {
     if (STATE.playlist.length === 0) return;
-    STATE.currentIndex = (STATE.currentIndex - 1 + STATE.playlist.length) % STATE.playlist.length;
+    if (STATE.playMode === 'shuffle') {
+      STATE.currentIndex = Math.floor(Math.random() * STATE.playlist.length);
+    } else {
+      STATE.currentIndex = (STATE.currentIndex - 1 + STATE.playlist.length) % STATE.playlist.length;
+    }
     playSong(STATE.playlist[STATE.currentIndex]);
   }
 
   function togglePlay() {
     if (STATE.isPlaying) STATE.audio.pause();
     else STATE.audio.play();
+  }
+
+  function cyclePlayMode() {
+    var modes = ['loop', 'single', 'shuffle'];
+    var idx = modes.indexOf(STATE.playMode);
+    STATE.playMode = modes[(idx + 1) % modes.length];
+    saveSettings();
+    if (STATE.appRefs.playModeBtn) {
+      updatePlayModeBtn();
+    }
+  }
+
+  function setVolume(vol) {
+    STATE.volume = Math.max(0, Math.min(1, vol));
+    if (STATE.audio) STATE.audio.volume = STATE.volume;
+    saveSettings();
   }
 
   // ==================== UI 更新 ====================
@@ -663,6 +695,79 @@
     if (!STATE.appRefs.playBtn) return;
     STATE.appRefs.playBtn.innerHTML = '';
     STATE.appRefs.playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 22, 'white'));
+  }
+
+  function updatePlayModeBtn() {
+    if (!STATE.appRefs.playModeBtn) return;
+    var btn = STATE.appRefs.playModeBtn;
+    btn.innerHTML = '';
+
+    // 根据模式创建对应图标
+    var iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('width', '18');
+    iconSvg.setAttribute('height', '18');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.setAttribute('stroke', C.primary);
+    iconSvg.setAttribute('stroke-width', '1.5');
+
+    if (STATE.playMode === 'single') {
+      // 单曲循环
+      var path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path1.setAttribute('d', 'M17 4l3 3-3 3');
+      var path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path2.setAttribute('d', 'M20 7H8a4 4 0 0 0-4 4v0');
+      var path3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path3.setAttribute('d', 'M7 20l-3-3 3-3');
+      var path4 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path4.setAttribute('d', 'M4 17h12a4 4 0 0 0 4-4v0');
+      var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', '12');
+      text.setAttribute('y', '14.5');
+      text.setAttribute('font-size', '7');
+      text.setAttribute('font-weight', '700');
+      text.setAttribute('fill', C.primary);
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = '1';
+      iconSvg.appendChild(path1);
+      iconSvg.appendChild(path2);
+      iconSvg.appendChild(path3);
+      iconSvg.appendChild(path4);
+      iconSvg.appendChild(text);
+      btn.title = '单曲循环';
+    } else if (STATE.playMode === 'shuffle') {
+      // 随机播放
+      var path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path1.setAttribute('d', 'M3 6h3l12 12h3');
+      var path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path2.setAttribute('d', 'M18 6h3l-3-3');
+      var path3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path3.setAttribute('d', 'M3 18h3l12-12h3');
+      var path4 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path4.setAttribute('d', 'M18 18h3l-3 3');
+      iconSvg.appendChild(path1);
+      iconSvg.appendChild(path2);
+      iconSvg.appendChild(path3);
+      iconSvg.appendChild(path4);
+      btn.title = '随机播放';
+    } else {
+      // 列表循环
+      var path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path1.setAttribute('d', 'M17 4l3 3-3 3');
+      var path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path2.setAttribute('d', 'M20 7H8a4 4 0 0 0-4 4v0');
+      var path3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path3.setAttribute('d', 'M7 20l-3-3 3-3');
+      var path4 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path4.setAttribute('d', 'M4 17h12a4 4 0 0 0 4-4v0');
+      iconSvg.appendChild(path1);
+      iconSvg.appendChild(path2);
+      iconSvg.appendChild(path3);
+      iconSvg.appendChild(path4);
+      btn.title = '列表循环';
+    }
+
+    btn.appendChild(iconSvg);
   }
 
   function updateProgress() {
@@ -972,9 +1077,59 @@
     controls.appendChild(playBtn);
     controls.appendChild(nextBtn);
 
+    // 播放模式和音量控制
+    var subActions = document.createElement('div');
+    subActions.style.cssText = 'display:flex;align-items:center;justify-content:space-around;gap:16px;margin-top:12px;padding:0 20px';
+
+    // 播放模式按钮
+    var playModeBtn = document.createElement('button');
+    playModeBtn.style.cssText = `
+      display:flex;flex-direction:column;align-items:center;gap:4px;
+      border:none;background:transparent;cursor:pointer;opacity:0.6;transition:opacity 0.2s;
+    `;
+    playModeBtn.onmouseenter = function() { this.style.opacity = '1'; };
+    playModeBtn.onmouseleave = function() { this.style.opacity = '0.6'; };
+    playModeBtn.onclick = cyclePlayMode;
+
+    var playModeLabel = document.createElement('span');
+    playModeLabel.textContent = 'Loop';
+    playModeLabel.style.cssText = `font-size:8px;color:${C.primary};text-transform:uppercase;letter-spacing:0.15em`;
+    playModeBtn.appendChild(playModeLabel);
+
+    // 音量控制
+    var volumeBox = document.createElement('div');
+    volumeBox.style.cssText = 'flex:1;display:flex;align-items:center;gap:8px;max-width:200px';
+
+    var volumeIcon = document.createElement('span');
+    volumeIcon.textContent = '🔊';
+    volumeIcon.style.cssText = 'font-size:14px;opacity:0.6';
+
+    var volumeSlider = document.createElement('input');
+    volumeSlider.type = 'range';
+    volumeSlider.min = '0';
+    volumeSlider.max = '100';
+    volumeSlider.value = String(STATE.volume * 100);
+    volumeSlider.style.cssText = `
+      flex:1;height:4px;border-radius:2px;outline:none;
+      -webkit-appearance:none;
+      background:linear-gradient(to right, ${C.primary} 0%, ${C.primary} ${STATE.volume * 100}%, ${C.faint}30 ${STATE.volume * 100}%, ${C.faint}30 100%);
+    `;
+    volumeSlider.oninput = function() {
+      var vol = parseInt(this.value) / 100;
+      setVolume(vol);
+      this.style.background = `linear-gradient(to right, ${C.primary} 0%, ${C.primary} ${vol * 100}%, ${C.faint}30 ${vol * 100}%, ${C.faint}30 100%)`;
+    };
+
+    volumeBox.appendChild(volumeIcon);
+    volumeBox.appendChild(volumeSlider);
+
+    subActions.appendChild(playModeBtn);
+    subActions.appendChild(volumeBox);
+
     playerSection.appendChild(nowPlayingBox);
     playerSection.appendChild(progressBox);
     playerSection.appendChild(controls);
+    playerSection.appendChild(subActions);
 
     main.appendChild(header);
     main.appendChild(searchBox);
@@ -985,7 +1140,8 @@
     // 保存引用
     STATE.appRefs = {
       searchInput, searchResults, playerSection, albumCover, songName, songArtist,
-      progressBar, progressFill, currentTimeLabel, durationLabel, playBtn, nowPlaying: songInfo
+      progressBar, progressFill, currentTimeLabel, durationLabel, playBtn,
+      playModeBtn, nowPlaying: songInfo
     };
   }
 
@@ -1016,6 +1172,10 @@
           loadSettings();
           initAudio();
           createUI();
+          // 初始化播放模式按钮
+          if (STATE.appRefs.playModeBtn) {
+            updatePlayModeBtn();
+          }
         },
         async unmount(container) {
           if (STATE.audio) {
