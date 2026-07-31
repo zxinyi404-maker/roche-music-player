@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-07:00-v2.6.0-profile';
+  var BUILD_TIME = '2026-08-01-10:00-v3.0.0-complete';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1976,7 +1976,7 @@
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '2.0.3',
+      version: '3.0.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
