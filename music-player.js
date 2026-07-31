@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-23:55-v1.21.2';
+  var BUILD_TIME = '2026-08-01-00:00-v1.21.3';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -662,7 +662,10 @@
 
     // 播放事件
     function onPlay() {
-      console.log('[audio] play 事件触发', STATE.currentSong ? STATE.currentSong.name : '无');
+      // 只在有歌曲时输出，避免刷屏
+      if (STATE.currentSong) {
+        console.log('[audio] play 事件:', STATE.currentSong.name);
+      }
       STATE.isPlaying = true;
       // 任何成功的播放都意味着音频已解锁
       STATE.audioUnlocked = true;
