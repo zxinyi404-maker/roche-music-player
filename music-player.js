@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-01:30-v2.0.1-shizuku';
+  var BUILD_TIME = '2026-08-01-02:00-v2.1.0-login';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -37,7 +37,10 @@
     appContainer: null,
     appRefs: {},
     searchResults: [],
-    roche: null
+    roche: null,
+    // 登录状态
+    qrPollTimer: null,
+    currentView: 'main' // 'main' | 'login'
   };
 
   // ==================== 工具函数 ====================
@@ -63,6 +66,7 @@
 @keyframes shizuku-glow{0%,100%{box-shadow:0 0 15px ${C.glow}40}50%{box-shadow:0 0 25px ${C.glow}80}}
 @keyframes shizuku-vinyl{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes shizuku-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .shizuku-glass{background:rgba(255,255,255,0.22);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.35)}
 .shizuku-glass-strong{background:rgba(255,255,255,0.45);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.5)}
 .shizuku-scrollbar::-webkit-scrollbar{width:3px}
@@ -144,10 +148,464 @@
   function loginQrCreate(key) { return neteaseCall('/login/qr/create', { key, qrimg: true }); }
   function loginQrCheck(key) { return neteaseCall('/login/qr/check', { key }); }
   function loginStatus() { return neteaseCall('/login/status', {}); }
+  function captchaSent(phone) { return neteaseCall('/captcha/sent', { phone }); }
+  function loginCellphone(phone, captcha) { return neteaseCall('/login/cellphone', { phone, captcha }); }
   function neteaseSearch(keyword) { return neteaseCall('/search', { keyword, limit: 30, type: 1 }); }
   function neteaseSongUrl(id) { return neteaseCall('/song/url', { id, level: STATE.quality }); }
 
-  // ==================== 播放器核心 ====================
+  // ==================== 登录功能 ====================
+
+  // 获取用户信息
+  function fetchUserInfo() {
+    if (!STATE.cookie) return Promise.resolve(null);
+    return loginStatus().then(function(data) {
+      console.log('[loginStatus 响应]', data);
+      if (data && data.data && data.data.profile) {
+        STATE.userProfile = data.data.profile;
+        saveSettings();
+        return data.data.profile;
+      }
+      return null;
+    }).catch(function(e) {
+      console.error('[获取用户信息失败]', e);
+      return null;
+    });
+  }
+
+  // 登录成功回调
+  function onLoggedIn(cookie) {
+    console.log('[登录成功]', cookie);
+    STATE.cookie = cookie;
+    fetchUserInfo().then(function() {
+      STATE.currentView = 'main';
+      createUI(); // 重新渲染界面
+    });
+  }
+
+  // 显示登录界面
+  function showLoginPanel() {
+    STATE.currentView = 'login';
+    createUI();
+  }
+
+  // 退出登录
+  function logout() {
+    STATE.cookie = '';
+    STATE.userProfile = null;
+    saveSettings();
+    STATE.currentView = 'main';
+    createUI();
+  }
+
+  // ==================== 登录面板 UI ====================
+  function createLoginPanel() {
+    var loginState = {
+      mode: 'qr', // 'qr' | 'phone' | 'manual'
+      qrKey: '',
+      qrImg: '',
+      qrStatus: 'idle', // 'idle' | 'waiting' | 'scanned' | 'expired' | 'done'
+      phone: '',
+      captcha: '',
+      cooldown: 0,
+      manualCookie: ''
+    };
+
+    var container = document.createElement('div');
+    container.style.cssText = `
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, #ffffff 0%, ${C.bg} 50%, ${C.bgDeep} 100%);
+      display:flex;flex-direction:column;z-index:100;
+    `;
+
+    // 背景装饰
+    var bokeh = document.createElement('div');
+    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+    bokeh.innerHTML = `
+      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
+        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+        animation:shizuku-float 8s ease-in-out infinite"></div>
+    `;
+    container.appendChild(bokeh);
+
+    // 头部
+    var header = document.createElement('div');
+    header.className = 'shizuku-glass-strong';
+    header.style.cssText = `
+      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+    `;
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary}`;
+    backBtn.appendChild(svg('x', 16, C.primary));
+    backBtn.onclick = function() {
+      if (STATE.qrPollTimer) {
+        clearInterval(STATE.qrPollTimer);
+        STATE.qrPollTimer = null;
+      }
+      STATE.currentView = 'main';
+      createUI();
+    };
+    var title = document.createElement('div');
+    title.textContent = '登录网易云';
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    header.appendChild(backBtn);
+    header.appendChild(title);
+    header.appendChild(document.createElement('div')); // placeholder
+    container.appendChild(header);
+
+    // 模式切换器
+    var modeSwitcher = document.createElement('div');
+    modeSwitcher.className = 'shizuku-glass';
+    modeSwitcher.style.cssText = `
+      margin:12px 16px;padding:4px;border-radius:20px;
+      display:flex;gap:4px;position:relative;z-index:10;
+    `;
+    var modes = [
+      { k: 'qr', label: '扫码' },
+      { k: 'phone', label: '手机号' },
+      { k: 'manual', label: 'Cookie' }
+    ];
+    modes.forEach(function(m) {
+      var btn = document.createElement('button');
+      btn.textContent = m.label;
+      btn.style.cssText = `
+        flex:1;padding:8px;border-radius:16px;border:none;cursor:pointer;
+        font-size:11px;letter-spacing:0.1em;transition:all 0.2s;
+        color:${loginState.mode === m.k ? 'white' : C.muted};
+        background:${loginState.mode === m.k ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'transparent'};
+      `;
+      btn.onclick = function() {
+        loginState.mode = m.k;
+        createLoginPanel(); // 重新渲染
+      };
+      modeSwitcher.appendChild(btn);
+    });
+    container.appendChild(modeSwitcher);
+
+    // 内容区域
+    var content = document.createElement('div');
+    content.className = 'shizuku-scrollbar';
+    content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
+
+    if (loginState.mode === 'qr') {
+      content.appendChild(createQrLogin(loginState));
+    } else if (loginState.mode === 'phone') {
+      content.appendChild(createPhoneLogin(loginState));
+    } else {
+      content.appendChild(createManualLogin(loginState));
+    }
+
+    container.appendChild(content);
+    STATE.appContainer.innerHTML = '';
+    STATE.appContainer.appendChild(container);
+  }
+
+  // 扫码登录
+  function createQrLogin(loginState) {
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center';
+
+    var qrBox = document.createElement('div');
+    qrBox.className = 'shizuku-glass-strong';
+    qrBox.style.cssText = `
+      position:relative;padding:16px;border-radius:24px;
+      box-shadow:0 8px 40px ${C.glow}20;
+    `;
+
+    if (loginState.qrImg) {
+      var img = document.createElement('img');
+      img.src = loginState.qrImg;
+      img.style.cssText = 'width:192px;height:192px;border-radius:12px;display:block';
+      qrBox.appendChild(img);
+    } else {
+      var loading = document.createElement('div');
+      loading.style.cssText = `
+        width:192px;height:192px;border-radius:12px;display:flex;
+        align-items:center;justify-content:center;background:${C.glass};
+      `;
+      var spinner = document.createElement('div');
+      spinner.style.cssText = `
+        width:20px;height:20px;border:2px solid ${C.faint}40;
+        border-top-color:${C.primary};border-radius:50%;animation:spin 1s linear infinite;
+      `;
+      loading.appendChild(spinner);
+      qrBox.appendChild(loading);
+
+      // 自动开始扫码
+      if (loginState.qrStatus === 'idle') {
+        loginState.qrStatus = 'waiting';
+        startQrLogin(loginState, qrBox);
+      }
+    }
+
+    wrapper.appendChild(qrBox);
+
+    var statusText = {
+      idle: '准备中...',
+      waiting: '请用网易云 App 扫描上方二维码',
+      scanned: '已扫描，请在手机上确认',
+      expired: '二维码已过期',
+      done: '登录中...'
+    };
+
+    var status = document.createElement('div');
+    status.textContent = statusText[loginState.qrStatus];
+    status.style.cssText = `margin-top:16px;font-size:11px;color:${C.primary};text-align:center`;
+    wrapper.appendChild(status);
+
+    if (loginState.qrStatus === 'expired') {
+      var refreshBtn = document.createElement('button');
+      refreshBtn.textContent = '刷新二维码';
+      refreshBtn.style.cssText = `
+        margin-top:12px;padding:8px 16px;border-radius:20px;border:none;cursor:pointer;
+        font-size:10px;color:white;
+        background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      `;
+      refreshBtn.onclick = function() {
+        loginState.qrStatus = 'waiting';
+        loginState.qrImg = '';
+        createLoginPanel();
+      };
+      wrapper.appendChild(refreshBtn);
+    }
+
+    var tip = document.createElement('div');
+    tip.textContent = '打开网易云 App → 我的 → 右上角扫一扫';
+    tip.style.cssText = `margin-top:12px;font-size:9px;color:${C.faint};font-style:italic;text-align:center;max-width:220px`;
+    wrapper.appendChild(tip);
+
+    return wrapper;
+  }
+
+  // 开始扫码登录流程
+  function startQrLogin(loginState, qrBox) {
+    loginQrKey().then(function(keyRes) {
+      var key = (keyRes.data && keyRes.data.unikey) || keyRes.unikey;
+      if (!key) throw new Error('无法获取 key');
+      loginState.qrKey = key;
+      return loginQrCreate(key);
+    }).then(function(createRes) {
+      var img = (createRes.data && createRes.data.qrimg) || createRes.qrimg;
+      if (!img) throw new Error('无法生成二维码');
+      loginState.qrImg = img;
+
+      // 更新二维码显示
+      qrBox.innerHTML = '';
+      var qrImg = document.createElement('img');
+      qrImg.src = img;
+      qrImg.style.cssText = 'width:192px;height:192px;border-radius:12px;display:block';
+      qrBox.appendChild(qrImg);
+
+      // 开始轮询
+      STATE.qrPollTimer = setInterval(function() {
+        loginQrCheck(loginState.qrKey).then(function(r) {
+          var code = r.code;
+          if (code === 800) {
+            loginState.qrStatus = 'expired';
+            clearInterval(STATE.qrPollTimer);
+            createLoginPanel();
+          } else if (code === 801) {
+            loginState.qrStatus = 'waiting';
+          } else if (code === 802) {
+            loginState.qrStatus = 'scanned';
+            createLoginPanel();
+          } else if (code === 803) {
+            clearInterval(STATE.qrPollTimer);
+            loginState.qrStatus = 'done';
+            var cookie = r.cookie || '';
+            var m = cookie.match(/MUSIC_U=([^;]+)/i);
+            var musicU = m ? m[1] : '';
+            if (musicU) {
+              onLoggedIn('MUSIC_U=' + musicU);
+            }
+          }
+        }).catch(function(e) {
+          console.error('[轮询失败]', e);
+        });
+      }, 2500);
+    }).catch(function(e) {
+      console.error('[扫码失败]', e);
+      loginState.qrStatus = 'idle';
+    });
+  }
+
+  // 手机号登录
+  function createPhoneLogin(loginState) {
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'max-width:320px;margin:0 auto';
+
+    var phoneBox = document.createElement('div');
+    phoneBox.className = 'shizuku-glass';
+    phoneBox.style.cssText = 'padding:12px;border-radius:16px;margin-bottom:12px';
+
+    var phoneLabel = document.createElement('div');
+    phoneLabel.textContent = '手机号 (仅中国)';
+    phoneLabel.style.cssText = `font-size:10px;color:${C.muted};margin-bottom:8px;letter-spacing:0.1em`;
+    phoneBox.appendChild(phoneLabel);
+
+    var phoneInput = document.createElement('input');
+    phoneInput.className = 'shizuku-glass';
+    phoneInput.placeholder = '13800138000';
+    phoneInput.value = loginState.phone;
+    phoneInput.style.cssText = `
+      width:100%;padding:10px 12px;border-radius:12px;border:none;outline:none;
+      font-size:13px;color:${C.text};
+    `;
+    phoneInput.oninput = function() {
+      loginState.phone = this.value.replace(/\D/g, '').slice(0, 11);
+      this.value = loginState.phone;
+    };
+    phoneBox.appendChild(phoneInput);
+    wrapper.appendChild(phoneBox);
+
+    var captchaBox = document.createElement('div');
+    captchaBox.className = 'shizuku-glass';
+    captchaBox.style.cssText = 'padding:12px;border-radius:16px;margin-bottom:12px';
+
+    var captchaHeader = document.createElement('div');
+    captchaHeader.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:8px';
+    var captchaLabel = document.createElement('span');
+    captchaLabel.textContent = '验证码';
+    captchaLabel.style.cssText = `font-size:10px;color:${C.muted};letter-spacing:0.1em`;
+
+    var sendBtn = document.createElement('button');
+    sendBtn.textContent = loginState.cooldown > 0 ? loginState.cooldown + 's 后重发' : '获取验证码';
+    sendBtn.disabled = loginState.cooldown > 0;
+    sendBtn.style.cssText = `
+      font-size:10px;color:${C.accent};border:none;background:transparent;cursor:pointer;
+      opacity:${loginState.cooldown > 0 ? '0.4' : '1'};
+    `;
+    sendBtn.onclick = function() {
+      if (!/^\d{11}$/.test(loginState.phone)) {
+        alert('请输入11位手机号');
+        return;
+      }
+      captchaSent(loginState.phone).then(function(r) {
+        if (r.code === 200 || r.data === true) {
+          alert('验证码已发送');
+          loginState.cooldown = 60;
+          var countdown = setInterval(function() {
+            loginState.cooldown--;
+            sendBtn.textContent = loginState.cooldown + 's 后重发';
+            if (loginState.cooldown <= 0) {
+              clearInterval(countdown);
+              sendBtn.textContent = '获取验证码';
+              sendBtn.disabled = false;
+            }
+          }, 1000);
+        } else {
+          alert(r.message || '发送失败');
+        }
+      });
+    };
+
+    captchaHeader.appendChild(captchaLabel);
+    captchaHeader.appendChild(sendBtn);
+    captchaBox.appendChild(captchaHeader);
+
+    var captchaInput = document.createElement('input');
+    captchaInput.className = 'shizuku-glass';
+    captchaInput.placeholder = '6 位验证码';
+    captchaInput.value = loginState.captcha;
+    captchaInput.style.cssText = `
+      width:100%;padding:10px 12px;border-radius:12px;border:none;outline:none;
+      font-size:13px;color:${C.text};letter-spacing:0.3em;
+    `;
+    captchaInput.oninput = function() {
+      loginState.captcha = this.value.replace(/\D/g, '').slice(0, 6);
+      this.value = loginState.captcha;
+    };
+    captchaBox.appendChild(captchaInput);
+    wrapper.appendChild(captchaBox);
+
+    var loginBtn = document.createElement('button');
+    loginBtn.textContent = '登录';
+    loginBtn.style.cssText = `
+      width:100%;padding:12px;border-radius:16px;border:none;cursor:pointer;
+      font-size:13px;color:white;letter-spacing:0.2em;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      box-shadow:0 3px 18px ${C.glow}30;
+    `;
+    loginBtn.onclick = function() {
+      if (!loginState.phone || !loginState.captcha) {
+        alert('请填写手机号和验证码');
+        return;
+      }
+      loginCellphone(loginState.phone, loginState.captcha).then(function(r) {
+        if (r.code !== 200) {
+          alert(r.message || r.msg || '登录失败');
+          return;
+        }
+        var cookie = r.cookie || '';
+        var m = cookie.match(/MUSIC_U=([^;]+)/i);
+        var musicU = m ? m[1] : '';
+        if (musicU) {
+          onLoggedIn('MUSIC_U=' + musicU);
+        } else {
+          alert('登录信息不完整，请重试');
+        }
+      });
+    };
+    wrapper.appendChild(loginBtn);
+
+    return wrapper;
+  }
+
+  // 手动 Cookie 登录
+  function createManualLogin(loginState) {
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'max-width:320px;margin:0 auto';
+
+    var cookieBox = document.createElement('div');
+    cookieBox.className = 'shizuku-glass';
+    cookieBox.style.cssText = 'padding:12px;border-radius:16px;margin-bottom:12px';
+
+    var label = document.createElement('div');
+    label.textContent = 'MUSIC_U Cookie';
+    label.style.cssText = `font-size:10px;color:${C.muted};margin-bottom:8px;letter-spacing:0.1em`;
+    cookieBox.appendChild(label);
+
+    var textarea = document.createElement('textarea');
+    textarea.className = 'shizuku-glass';
+    textarea.placeholder = 'MUSIC_U=xxx... 或直接粘贴 cookie 值';
+    textarea.value = loginState.manualCookie;
+    textarea.rows = 4;
+    textarea.style.cssText = `
+      width:100%;padding:10px 12px;border-radius:12px;border:none;outline:none;resize:none;
+      font-size:10px;color:${C.text};font-family:monospace;
+    `;
+    textarea.oninput = function() {
+      loginState.manualCookie = this.value;
+    };
+    cookieBox.appendChild(textarea);
+
+    var tip = document.createElement('div');
+    tip.textContent = 'music.163.com 登录 → F12 → Application → Cookies → 复制 MUSIC_U';
+    tip.style.cssText = `margin-top:8px;font-size:9px;color:${C.faint};font-style:italic`;
+    cookieBox.appendChild(tip);
+    wrapper.appendChild(cookieBox);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存并登录';
+    saveBtn.style.cssText = `
+      width:100%;padding:12px;border-radius:16px;border:none;cursor:pointer;
+      font-size:13px;color:white;letter-spacing:0.2em;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      box-shadow:0 3px 18px ${C.glow}30;
+    `;
+    saveBtn.onclick = function() {
+      var v = loginState.manualCookie.trim();
+      if (!v) {
+        alert('请输入 Cookie');
+        return;
+      }
+      var final = v.toUpperCase().startsWith('MUSIC_U=') ? v : 'MUSIC_U=' + v;
+      onLoggedIn(final);
+    };
+    wrapper.appendChild(saveBtn);
+
+    return wrapper;
+  }
   function initAudio() {
     STATE.audio = new Audio();
     STATE.audio.volume = STATE.volume;
@@ -286,6 +744,14 @@
   // ==================== UI 构建 ====================
   function createUI() {
     injectStyles();
+
+    // 根据当前视图决定渲染内容
+    if (STATE.currentView === 'login') {
+      createLoginPanel();
+      return;
+    }
+
+    // 主界面
     STATE.appContainer.style.cssText = `
       width:100%;height:100%;
       background:linear-gradient(180deg, ${C.bg} 0%, ${C.bgDeep} 100%);
@@ -331,10 +797,36 @@
     title.appendChild(titleText);
     title.appendChild(sparkle(7, C.sakura, 1.2));
     header.appendChild(title);
-    var ver = document.createElement('div');
-    ver.textContent = 'v2.0.1';
-    ver.style.cssText = 'font-size:10px;color:' + C.faint;
-    header.appendChild(ver);
+
+    // 右侧：登录按钮或用户信息
+    var rightArea = document.createElement('div');
+    rightArea.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+    if (STATE.cookie && STATE.userProfile) {
+      // 已登录：显示用户头像
+      var avatar = document.createElement('img');
+      avatar.src = STATE.userProfile.avatarUrl || '';
+      avatar.style.cssText = `
+        width:28px;height:28px;border-radius:50%;cursor:pointer;
+        border:1.5px solid ${C.sakura};
+      `;
+      avatar.onclick = logout; // 点击头像退出登录
+      avatar.title = '点击退出登录';
+      rightArea.appendChild(avatar);
+    } else {
+      // 未登录：显示登录按钮
+      var loginBtn = document.createElement('button');
+      loginBtn.textContent = '登录';
+      loginBtn.style.cssText = `
+        padding:6px 12px;border-radius:12px;border:none;cursor:pointer;
+        font-size:11px;color:white;
+        background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      `;
+      loginBtn.onclick = showLoginPanel;
+      rightArea.appendChild(loginBtn);
+    }
+
+    header.appendChild(rightArea);
 
     // 搜索栏
     var searchBox = document.createElement('div');
