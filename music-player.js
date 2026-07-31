@@ -413,6 +413,8 @@
       phone: '',
       captcha: '',
       cooldown: 0,
+      sending: false,
+      loggingIn: false,
       manualCookie: ''
     };
 
