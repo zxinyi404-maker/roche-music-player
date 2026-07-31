@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.4.0",
-  "description": "✨ 最终版：完整照抄SullyOS所有美化+功能+iOS适配",
+  "version": "3.4.1",
+  "description": "✨ 歌曲列表美化：玻璃卡片+VIP标识+星芒装饰（完全照抄SullyOS）",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
