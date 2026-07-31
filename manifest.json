@@ -1,0 +1,10 @@
+{
+  "id": "roche-music-player",
+  "name": "音乐播放器",
+  "version": "1.16.10",
+  "description": "entry切换为jsDelivr CDN分发，解决raw.githubusercontent国内下载失败导致加载旧版JS的问题",
+  "author": "Roche",
+  "entry": "https://cdn.jsdelivr.net/gh/luyi90720-sys/roche-music-player@v1.16.10/music-player.js",
+  "hash": "",
+  "permissions": ["storage", "ui", "memory:read"]
+}
