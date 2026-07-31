@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-05:00-v2.4.0-playlist';
+  var BUILD_TIME = '2026-08-01-06:00-v2.5.0-fix-flow';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1161,6 +1161,12 @@
   function createUI() {
     injectStyles();
 
+    // 未登录时直接显示登录界面
+    if (!STATE.cookie || !STATE.userProfile) {
+      createLoginPanel();
+      return;
+    }
+
     // 根据当前视图决定渲染内容
     if (STATE.currentView === 'login') {
       createLoginPanel();
@@ -1172,7 +1178,7 @@
       return;
     }
 
-    // 主界面
+    // 主界面（搜索 + 播放）
     STATE.appContainer.style.cssText = `
       width:100%;height:100%;
       background:linear-gradient(180deg, ${C.bg} 0%, ${C.bgDeep} 100%);
