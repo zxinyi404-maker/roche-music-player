@@ -186,6 +186,8 @@
   function neteaseUserPlaylist(uid) { return neteaseCall('/user/playlist', { uid, limit: 100 }); }
   function neteasePlaylistDetail(id) { return neteaseCall('/playlist/detail', { id }); }
   function neteaseRecommendSongs() { return neteaseCall('/recommend/songs', {}); }
+  function neteasePersonalFm() { return neteaseCall('/personal_fm', {}); }
+  function neteaseDailySignin() { return neteaseCall('/daily_signin', { type: 1 }); }
 
   // ==================== 登录功能 ====================
 
@@ -208,7 +210,88 @@
     });
   }
 
-  // 加载用户歌单
+  // 签到功能
+  function doSignIn() {
+    console.log('[签到]');
+    neteaseDailySignin().then(function(data) {
+      if (data.code === 200) {
+        STATE.signedIn = true;
+        alert('签到成功 +' + (data.point || 5));
+        createUI();
+      } else if (data.code === -2 || (data.msg && data.msg.includes('重复'))) {
+        STATE.signedIn = true;
+        alert('今天已经签过了');
+        createUI();
+      } else {
+        alert('签到失败：' + (data.msg || data.message || '未知错误'));
+      }
+    }).catch(function(e) {
+      console.error('[签到失败]', e);
+      if (String(e.message).includes('重复')) {
+        STATE.signedIn = true;
+        alert('今天已经签过了');
+        createUI();
+      } else {
+        alert('签到失败：' + e.message);
+      }
+    });
+  }
+
+  // 加载私人FM
+  function loadPersonalFm() {
+    console.log('[加载私人FM]');
+    neteasePersonalFm().then(function(data) {
+      var songs = (data.data || []).map(function(s) {
+        return {
+          id: s.id,
+          name: s.name,
+          artist: (s.artists || s.ar || []).map(function(a) { return a.name; }).join(' / '),
+          album: (s.album || s.al || {}).name || '',
+          pic: toHttps((s.album || s.al || {}).picUrl || ''),
+          duration: (s.duration || s.dt || 0) / 1000
+        };
+      });
+      if (songs.length === 0) {
+        alert('FM 暂无歌曲');
+        return;
+      }
+      STATE.playlist = songs;
+      STATE.currentIndex = 0;
+      playSong(songs[0]);
+      STATE.currentView = 'player';
+      createUI();
+    }).catch(function(e) {
+      console.error('[加载私人FM失败]', e);
+      alert('FM 失败：' + e.message);
+    });
+  }
+
+  // 加载每日推荐
+  function loadDailyRecommend() {
+    console.log('[加载每日推荐]');
+    neteaseRecommendSongs().then(function(data) {
+      var songs = ((data.data && data.data.dailySongs) || data.dailySongs || []).map(function(s) {
+        return {
+          id: s.id,
+          name: s.name,
+          artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+          album: (s.al || {}).name || '',
+          pic: toHttps((s.al || {}).picUrl || ''),
+          duration: (s.dt || 0) / 1000
+        };
+      });
+      if (songs.length === 0) {
+        alert('暂无推荐歌曲');
+        return;
+      }
+      STATE.searchResults = songs;
+      STATE.currentView = 'search';
+      createUI();
+    }).catch(function(e) {
+      console.error('[加载每日推荐失败]', e);
+      alert('加载失败：' + e.message);
+    });
+  }
   function loadUserPlaylists() {
     if (!STATE.userProfile) return;
     neteaseUserPlaylist(STATE.userProfile.userId).then(function(data) {
@@ -1104,18 +1187,25 @@
     var quickBtns = document.createElement('div');
     quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px';
 
-    var btn1 = createQuickBtn('📅', '每日推荐', function() {
-      alert('每日推荐功能开发中');
+    // 签到按钮
+    var signBtn = createQuickBtn(STATE.signedIn ? '✅' : '📅', STATE.signedIn ? '已签到' : '签到', function() {
+      if (STATE.signedIn) return;
+      doSignIn();
+    });
+
+    var btn1 = createQuickBtn('🎵', '每日推荐', function() {
+      loadDailyRecommend();
     });
     var btn2 = createQuickBtn('📻', '私人FM', function() {
-      alert('私人FM功能开发中');
+      loadPersonalFm();
     });
-    var btn3 = createQuickBtn('🎵', '我的歌单', function() {
+    var btn3 = createQuickBtn('💿', '我的歌单', function() {
       STATE.currentView = 'playlist';
       createUI();
     });
     var btn4 = createQuickBtn('🚪', '退出登录', logout);
 
+    quickBtns.appendChild(signBtn);
     quickBtns.appendChild(btn1);
     quickBtns.appendChild(btn2);
     quickBtns.appendChild(btn3);
