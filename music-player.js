@@ -327,8 +327,16 @@
         clearInterval(STATE.qrPollTimer);
         STATE.qrPollTimer = null;
       }
-      STATE.currentView = 'main';
-      createUI();
+      // 如果已经登录过，返回主界面；否则关闭应用
+      if (STATE.cookie && STATE.userProfile) {
+        STATE.currentView = 'main';
+        createUI();
+      } else {
+        // 关闭 Roche 应用
+        if (STATE.roche && STATE.roche.ui && STATE.roche.ui.closeApp) {
+          STATE.roche.ui.closeApp();
+        }
+      }
     };
     var title = document.createElement('div');
     title.textContent = '登录网易云';
