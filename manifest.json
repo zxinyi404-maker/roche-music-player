@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.18.1",
-  "description": "🐛 修复扫码登录 Cookie 获取问题 - 兼容多种 API 返回格式 + 详细调试日志",
+  "version": "1.19.0",
+  "description": "✅ 完全照抄 SullyOS 扫码登录实现 - POST 请求 + SullyOS Worker 后端",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.18.1/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.19.0/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }

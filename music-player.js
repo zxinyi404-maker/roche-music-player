@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.18.1';
+  var BUILD_TIME = '2026-07-31-v1.19.0';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -39,7 +39,7 @@
     tlyrics: [],              // 解析后的翻译歌词 [{time, text}]
     currentLyricIndex: -1,    // 当前歌词行索引
     cookie: '',               // 网易云 cookie
-    backend: 'https://netease-api.vercel.app', // 网易云 API 公开服务
+    backend: 'https://sullymeow.ccwu.cc', // SullyOS 的 Worker（支持 /netease API）
     mcpBackend: 'https://ncm.chajianreader.cc.cd', // 网易云 MCP 服务器（HTTPS 直连腾讯云，扫码登录+开放平台API）
     mcpToken: '',             // MCP 服务器 accessToken（扫码登录后获取）
     defaultSource: 'netease', // 默认音源
@@ -550,29 +550,22 @@
     return fetch(url).then(function(r) { return r.json(); });
   }
 
-  // ==================== 网易云标准扫码登录 API（使用公开服务）====================
+  // ==================== 网易云标准扫码登录 API（照抄 SullyOS 实现）====================
 
-  // 网易云 API 通用调用（使用 NeteaseCloudMusicApi 服务）
-  function neteaseCall(path, params) {
-    // 使用标准的网易云 API 服务，路径格式：/login/qr/key
-    var url = STATE.backend.replace(/\/+$/, '') + path;
-
-    // 构建查询参数
-    var qs = '';
-    if (params && Object.keys(params).length > 0) {
-      qs = '?' + Object.keys(params).map(function(k) {
-        return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-      }).join('&');
-    }
+  // 网易云 API 通用调用（使用 NeteaseCloudMusicApi 服务，POST 请求）
+  function neteaseCall(path, body) {
+    // 照抄 SullyOS: 使用 /netease 前缀 + POST 请求
+    var url = STATE.backend.replace(/\/+$/, '') + '/netease' + path;
 
     var headers = { 'Content-Type': 'application/json' };
     if (STATE.cookie) {
-      headers['Cookie'] = STATE.cookie;
+      headers['X-Netease-Cookie'] = STATE.cookie;
     }
 
-    return fetch(url + qs, {
-      method: 'GET',
-      headers: headers
+    return fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body || {})
     }).then(function(res) {
       return res.json();
     });
@@ -580,17 +573,17 @@
 
   // 1. 获取二维码 key
   function loginQrKey() {
-    return neteaseCall('/login/qr/key', { timestamp: Date.now() });
+    return neteaseCall('/login/qr/key', {});
   }
 
   // 2. 创建二维码（返回 base64 图片）
   function loginQrCreate(key) {
-    return neteaseCall('/login/qr/create', { key: key, qrimg: true, timestamp: Date.now() });
+    return neteaseCall('/login/qr/create', { key: key, qrimg: true });
   }
 
   // 3. 检查扫码状态
   function loginQrCheck(key) {
-    return neteaseCall('/login/qr/check', { key: key, timestamp: Date.now() });
+    return neteaseCall('/login/qr/check', { key: key });
   }
 
   // ==================== 旧的 MCP 登录方式（备用）====================
@@ -4212,7 +4205,7 @@
         qrStatus.innerHTML = '请用<strong>网易云音乐 APP</strong>扫码登录';
         qrStatus.className = 'rmp-qr-status-el';
 
-        // 步骤 3: 轮询检查扫码状态
+        // 步骤 3: 轮询检查扫码状态（照抄 SullyOS）
         STATE.qrPollTimer = setInterval(function () {
           if (!document.body.contains(overlay)) {
             clearInterval(STATE.qrPollTimer);
@@ -4220,20 +4213,13 @@
             return;
           }
 
-          loginQrCheck(key).then(function (checkRes) {
-            if (!checkRes) return;
+          loginQrCheck(key).then(function (r) {
+            if (!r) return;
 
-            // 兼容不同的返回格式
-            var code = checkRes.code;
-            var cookie = checkRes.cookie || '';
+            // 照抄 SullyOS: 直接取 r.code，不需要处理嵌套的 data
+            var code = r.code;
 
-            // 如果返回格式是 { code: 200, data: { code: 803, cookie: "..." } }
-            if (code === 200 && checkRes.data) {
-              code = checkRes.data.code;
-              cookie = checkRes.data.cookie || '';
-            }
-
-            console.log('[扫码状态]', 'code:', code, 'cookie:', cookie ? '已获取' : '无');
+            console.log('[扫码状态] code:', code, '完整响应:', r);
 
             // 800: 二维码过期
             if (code === 800) {
@@ -4257,10 +4243,12 @@
               qrStatus.textContent = '登录成功！';
               qrStatus.className = 'rmp-qr-status-el success';
 
-              console.log('[登录成功] 完整响应:', checkRes);
-              console.log('[登录成功] Cookie:', cookie);
+              console.log('[登录成功] 完整响应:', r);
 
-              // 提取 cookie
+              // 提取 cookie（照抄 SullyOS）
+              var cookie = r.cookie || '';
+              console.log('[Cookie 原始值]', cookie);
+
               var match = cookie.match(/MUSIC_U=([^;]+)/i);
               var musicU = match ? match[1] : '';
 
