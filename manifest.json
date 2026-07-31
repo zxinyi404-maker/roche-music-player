@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "2.6.0",
-  "description": "✨ 完整用户主页：用户信息卡片 + 快捷按钮（每日推荐/私人FM/我的歌单/退出登录）",
+  "version": "2.7.0",
+  "description": "✨ 完整搜索页面 + 灵动岛播放器（苹果风格）+ 波形动画",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

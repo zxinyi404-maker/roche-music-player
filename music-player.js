@@ -96,6 +96,7 @@
 @keyframes shizuku-vinyl{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes shizuku-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes wave{0%,100%{height:8px}50%{height:16px}}
 .shizuku-glass{background:rgba(255,255,255,0.22);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.35)}
 .shizuku-glass-strong{background:rgba(255,255,255,0.45);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.5)}
 .shizuku-scrollbar::-webkit-scrollbar{width:3px}
@@ -1151,10 +1152,288 @@
 
   // ==================== 搜索页面 UI ====================
   function createSearchView() {
-    // TODO: 实现搜索页面
-    alert('搜索页面开发中');
-    STATE.currentView = 'profile';
-    createUI();
+    var container = document.createElement('div');
+    container.style.cssText = `
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, #ffffff 0%, ${C.bg} 50%, ${C.bgDeep} 100%);
+      display:flex;flex-direction:column;
+    `;
+
+    // 背景装饰
+    var bokeh = document.createElement('div');
+    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+    bokeh.innerHTML = `
+      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
+        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+        animation:shizuku-float 8s ease-in-out infinite"></div>
+    `;
+    container.appendChild(bokeh);
+
+    // 头部
+    var header = document.createElement('div');
+    header.className = 'shizuku-glass-strong';
+    header.style.cssText = `
+      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+    `;
+
+    var title = document.createElement('div');
+    title.textContent = '未来音楽';
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+
+    var rightBtns = document.createElement('div');
+    rightBtns.style.cssText = 'display:flex;gap:8px';
+
+    var profileBtn = document.createElement('button');
+    profileBtn.textContent = '👤';
+    profileBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px`;
+    profileBtn.onclick = function() {
+      STATE.currentView = 'profile';
+      createUI();
+    };
+    rightBtns.appendChild(profileBtn);
+
+    header.appendChild(title);
+    header.appendChild(rightBtns);
+    container.appendChild(header);
+
+    // 搜索栏
+    var searchBox = document.createElement('div');
+    searchBox.style.cssText = 'padding:12px;position:relative;z-index:10';
+
+    var searchInputWrap = document.createElement('div');
+    searchInputWrap.className = 'shizuku-glass';
+    searchInputWrap.style.cssText = `
+      display:flex;align-items:center;gap:10px;
+      padding:10px 14px;border-radius:16px;
+      box-shadow:0 2px 20px ${C.glow}15,inset 0 1px 0 rgba(255,255,255,0.4);
+    `;
+
+    searchInputWrap.appendChild(svg('search', 15, C.muted));
+
+    var searchInput = document.createElement('input');
+    searchInput.placeholder = '搜一首想听的歌...';
+    searchInput.style.cssText = `
+      flex:1;background:transparent;border:none;outline:none;
+      font-size:13px;color:${C.text};
+    `;
+    searchInput.onkeydown = function(e) {
+      if (e.key === 'Enter') {
+        doSearch(this.value);
+      }
+    };
+
+    var searchBtn = document.createElement('button');
+    searchBtn.textContent = '搜索';
+    searchBtn.style.cssText = `
+      padding:6px 12px;border-radius:10px;border:none;cursor:pointer;
+      font-size:11px;color:white;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+    `;
+    searchBtn.onclick = function() {
+      doSearch(searchInput.value);
+    };
+
+    searchInputWrap.appendChild(searchInput);
+    searchBox.appendChild(searchInputWrap);
+    searchBox.appendChild(searchBtn);
+    container.appendChild(searchBox);
+
+    // 结果列表
+    var resultsList = document.createElement('div');
+    resultsList.className = 'shizuku-scrollbar';
+    resultsList.style.cssText = 'flex:1;overflow-y:auto;padding:0 8px;padding-bottom:100px;position:relative;z-index:10';
+
+    if (STATE.searchResults.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = `text-align:center;padding:60px 20px;color:${C.faint}`;
+      empty.innerHTML = `
+        <div style="font-size:32px;margin-bottom:12px">✨</div>
+        <div style="font-size:12px;font-style:italic">搜一首想听的歌吧</div>
+      `;
+      resultsList.appendChild(empty);
+    } else {
+      STATE.searchResults.forEach(function(song, idx) {
+        var row = createSongRow(song, idx);
+        resultsList.appendChild(row);
+      });
+    }
+
+    container.appendChild(resultsList);
+
+    // 迷你播放器
+    if (STATE.currentSong) {
+      container.appendChild(createMiniPlayer());
+    }
+
+    STATE.appContainer.innerHTML = '';
+    STATE.appContainer.appendChild(container);
+  }
+
+  // 创建歌曲行
+  function createSongRow(song, idx) {
+    var row = document.createElement('div');
+    row.style.cssText = `
+      display:flex;align-items:center;gap:12px;padding:10px 12px;margin-bottom:6px;
+      border-radius:16px;cursor:pointer;transition:all 0.2s;
+      background:${STATE.currentSong && STATE.currentSong.id === song.id ? C.glass : 'rgba(255,255,255,0.08)'};
+    `;
+    row.onmouseenter = function() {
+      row.style.background = 'linear-gradient(135deg, ' + C.glass + ', rgba(137,212,255,0.15))';
+      row.style.boxShadow = '0 2px 16px ' + C.glow + '15';
+    };
+    row.onmouseleave = function() {
+      row.style.background = STATE.currentSong && STATE.currentSong.id === song.id ? C.glass : 'rgba(255,255,255,0.08)';
+      row.style.boxShadow = 'none';
+    };
+    row.onclick = function() {
+      STATE.playlist = STATE.searchResults;
+      STATE.currentIndex = idx;
+      playSong(song);
+      createUI(); // 重新渲染以显示迷你播放器
+    };
+
+    var img = document.createElement('img');
+    img.src = song.pic;
+    img.style.cssText = 'width:44px;height:44px;border-radius:12px;object-fit:cover;border:1.5px solid ' + C.faint + '40';
+
+    var info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+    info.innerHTML = `
+      <div style="font-size:13px;color:${C.text};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.name}</div>
+      <div style="font-size:11px;color:${C.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.artist}</div>
+    `;
+
+    var dur = document.createElement('div');
+    dur.textContent = formatTime(song.duration);
+    dur.style.cssText = 'font-size:10px;color:' + C.faint;
+
+    row.appendChild(img);
+    row.appendChild(info);
+    row.appendChild(dur);
+    return row;
+  }
+
+  // 搜索功能
+  function doSearch(keyword) {
+    if (!keyword || !keyword.trim()) return;
+    console.log('[搜索]', keyword);
+    neteaseSearch(keyword).then(function(resp) {
+      var songs = (resp.result || resp).songs || [];
+      if (songs.length === 0) {
+        STATE.searchResults = [];
+        createUI();
+        return;
+      }
+      STATE.searchResults = songs.map(function(s) {
+        return {
+          id: s.id,
+          name: s.name,
+          artist: (s.ar || s.artists || []).map(function(a) { return a.name; }).join(' / '),
+          album: (s.al || s.album || {}).name || '',
+          pic: toHttps((s.al || s.album || {}).picUrl || ''),
+          duration: (s.dt || s.duration || 0) / 1000
+        };
+      });
+      createUI();
+    }).catch(function(e) {
+      console.error('[搜索失败]', e);
+    });
+  }
+
+  // 灵动岛播放器
+  function createMiniPlayer() {
+    var island = document.createElement('div');
+    island.style.cssText = `
+      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);
+      border-radius:32px;padding:8px 16px;
+      display:flex;align-items:center;gap:12px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3);
+      z-index:1000;transition:all 0.3s ease;
+      cursor:pointer;
+    `;
+
+    // hover 效果
+    island.onmouseenter = function() {
+      island.style.transform = 'translateX(-50%) scale(1.05)';
+      island.style.boxShadow = '0 12px 40px rgba(0,0,0,0.4)';
+    };
+    island.onmouseleave = function() {
+      island.style.transform = 'translateX(-50%) scale(1)';
+      island.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3)';
+    };
+
+    island.onclick = function() {
+      STATE.currentView = 'player';
+      createUI();
+    };
+
+    // 封面（圆形）
+    var cover = document.createElement('img');
+    cover.src = STATE.currentSong.pic;
+    cover.style.cssText = `
+      width:36px;height:36px;border-radius:50%;
+      object-fit:cover;
+    `;
+
+    // 歌曲信息
+    var info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+    info.innerHTML = `
+      <div style="font-size:12px;color:white;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">${STATE.currentSong.name}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">${STATE.currentSong.artist}</div>
+    `;
+
+    // 波形动画（播放中）
+    var waveform = document.createElement('div');
+    waveform.style.cssText = 'display:flex;align-items:center;gap:2px;height:20px';
+    if (STATE.isPlaying) {
+      for (var i = 0; i < 3; i++) {
+        var bar = document.createElement('div');
+        bar.style.cssText = `
+          width:3px;background:white;border-radius:2px;
+          animation:wave 0.8s ease-in-out infinite;
+          animation-delay:${i * 0.15}s;
+        `;
+        bar.style.height = ['8px', '14px', '10px'][i];
+        waveform.appendChild(bar);
+      }
+    } else {
+      // 暂停图标
+      var pauseIcon = document.createElement('div');
+      pauseIcon.style.cssText = 'color:white;font-size:16px';
+      pauseIcon.textContent = '⏸';
+      waveform.appendChild(pauseIcon);
+    }
+
+    // 控制按钮（小）
+    var playBtn = document.createElement('button');
+    playBtn.style.cssText = `
+      width:28px;height:28px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.2);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
+    `;
+    playBtn.onmouseenter = function() {
+      this.style.background = 'rgba(255,255,255,0.3)';
+    };
+    playBtn.onmouseleave = function() {
+      this.style.background = 'rgba(255,255,255,0.2)';
+    };
+    playBtn.onclick = function(e) {
+      e.stopPropagation();
+      togglePlay();
+      createUI();
+    };
+    playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 14, 'white'));
+
+    island.appendChild(cover);
+    island.appendChild(info);
+    island.appendChild(waveform);
+    island.appendChild(playBtn);
+
+    return island;
   }
 
   // ==================== 播放器大页面 UI ====================
