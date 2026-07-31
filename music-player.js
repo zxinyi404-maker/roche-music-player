@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.18.0';
+  var BUILD_TIME = '2026-07-31-v1.18.1';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -4222,7 +4222,18 @@
 
           loginQrCheck(key).then(function (checkRes) {
             if (!checkRes) return;
+
+            // 兼容不同的返回格式
             var code = checkRes.code;
+            var cookie = checkRes.cookie || '';
+
+            // 如果返回格式是 { code: 200, data: { code: 803, cookie: "..." } }
+            if (code === 200 && checkRes.data) {
+              code = checkRes.data.code;
+              cookie = checkRes.data.cookie || '';
+            }
+
+            console.log('[扫码状态]', 'code:', code, 'cookie:', cookie ? '已获取' : '无');
 
             // 800: 二维码过期
             if (code === 800) {
@@ -4246,8 +4257,10 @@
               qrStatus.textContent = '登录成功！';
               qrStatus.className = 'rmp-qr-status-el success';
 
+              console.log('[登录成功] 完整响应:', checkRes);
+              console.log('[登录成功] Cookie:', cookie);
+
               // 提取 cookie
-              var cookie = checkRes.cookie || '';
               var match = cookie.match(/MUSIC_U=([^;]+)/i);
               var musicU = match ? match[1] : '';
 
@@ -4256,9 +4269,11 @@
                 saveSettings();
                 updateNeteaseLoginUI();
                 if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
+                console.log('[Cookie 已保存]', STATE.cookie);
               } else {
                 qrStatus.textContent = '登录成功但未获取到 Cookie';
                 qrStatus.className = 'rmp-qr-status-el error';
+                console.error('[Cookie 提取失败] 原始 cookie:', cookie);
               }
 
               clearInterval(STATE.qrPollTimer);
