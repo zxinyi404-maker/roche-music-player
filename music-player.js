@@ -188,6 +188,7 @@
   function neteaseRecommendSongs() { return neteaseCall('/recommend/songs', {}); }
   function neteasePersonalFm() { return neteaseCall('/personal_fm', {}); }
   function neteaseDailySignin() { return neteaseCall('/daily_signin', { type: 1 }); }
+  function neteaseRecordRecentSong(uid) { return neteaseCall('/record/recent/song', { uid }); }
 
   // ==================== 登录功能 ====================
 
@@ -207,6 +208,39 @@
     }).catch(function(e) {
       console.error('[获取用户信息失败]', e);
       return null;
+    });
+  }
+
+  // 加载播放记录
+  function loadPlayRecord() {
+    if (!STATE.userProfile) {
+      alert('请先登录');
+      return;
+    }
+    console.log('[加载播放记录]');
+    neteaseRecordRecentSong(STATE.userProfile.userId).then(function(data) {
+      var records = (data.data && data.data.list) || [];
+      var songs = records.map(function(r) {
+        var s = r.data || r.song || {};
+        return {
+          id: s.id,
+          name: s.name,
+          artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+          album: (s.al || {}).name || '',
+          pic: toHttps((s.al || {}).picUrl || ''),
+          duration: (s.dt || 0) / 1000
+        };
+      });
+      if (songs.length === 0) {
+        alert('暂无播放记录');
+        return;
+      }
+      STATE.searchResults = songs;
+      STATE.currentView = 'search';
+      createUI();
+    }).catch(function(e) {
+      console.error('[加载播放记录失败]', e);
+      alert('加载失败：' + e.message);
     });
   }
 
@@ -1175,8 +1209,16 @@
     var userInfo = document.createElement('div');
     userInfo.style.cssText = 'flex:1';
     userInfo.innerHTML = `
-      <div style="font-size:16px;font-weight:600;color:${C.text}">${STATE.userProfile.nickname || '用户'}</div>
+      <div style="font-size:16px;font-weight:600;color:${C.text};display:flex;align-items:center;gap:6px">
+        ${STATE.userProfile.nickname || '用户'}
+        ${STATE.userProfile.vipType ? '<span style="font-size:10px;background:linear-gradient(135deg, #FFD700, #FFA500);color:white;padding:2px 6px;border-radius:4px">VIP</span>' : ''}
+      </div>
       <div style="font-size:11px;color:${C.muted};margin-top:4px">${STATE.userProfile.signature || '这个人很懒，什么都没写'}</div>
+      <div style="font-size:10px;color:${C.faint};margin-top:6px;display:flex;gap:12px">
+        <span>歌单 ${STATE.userPlaylists.length}</span>
+        <span>关注 ${STATE.userProfile.follows || 0}</span>
+        <span>粉丝 ${STATE.userProfile.followeds || 0}</span>
+      </div>
     `;
 
     userCard.appendChild(avatar);
@@ -1185,7 +1227,7 @@
 
     // 快捷按钮
     var quickBtns = document.createElement('div');
-    quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px';
+    quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px';
 
     // 签到按钮
     var signBtn = createQuickBtn(STATE.signedIn ? '✅' : '📅', STATE.signedIn ? '已签到' : '签到', function() {
@@ -1203,13 +1245,17 @@
       STATE.currentView = 'playlist';
       createUI();
     });
-    var btn4 = createQuickBtn('🚪', '退出登录', logout);
+    var btn4 = createQuickBtn('🕐', '播放记录', function() {
+      loadPlayRecord();
+    });
+    var btn5 = createQuickBtn('🚪', '退出登录', logout);
 
     quickBtns.appendChild(signBtn);
     quickBtns.appendChild(btn1);
     quickBtns.appendChild(btn2);
     quickBtns.appendChild(btn3);
     quickBtns.appendChild(btn4);
+    quickBtns.appendChild(btn5);
     content.appendChild(quickBtns);
 
     container.appendChild(content);
