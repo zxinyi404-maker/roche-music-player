@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-23:15-v1.20.1';
+  var BUILD_TIME = '2026-07-31-23:30-v1.21.0';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -167,49 +167,6 @@
     return fetch(url, { headers: headers }).then(function (res) { return res.json(); });
   }
 
-  // 网易云 API（通过 VPS 代理，避免 CORS）
-  function neteaseApi(path, data, method) {
-    method = method || 'GET';
-    var fullUrl = 'https://music.163.com' + path;
-    var proxyUrl = STATE.mcpBackend.replace(/\/+$/, '') + '/proxy?url=' + encodeURIComponent(fullUrl);
-    var fetchOpts = {
-      method: method,
-      headers: { 'X-Netease-Cookie': STATE.cookie }
-    };
-    if (data && method === 'POST') {
-      if (typeof data === 'object') {
-        var pairs = [];
-        Object.keys(data).forEach(function(k) { pairs.push(encodeURIComponent(k) + '=' + encodeURIComponent(data[k])); });
-        fetchOpts.body = pairs.join('&');
-      } else {
-        fetchOpts.body = String(data);
-      }
-      fetchOpts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    }
-    console.log('[neteaseApi]', method, proxyUrl, fetchOpts.body || '');
-    var fetchPromise = fetch(proxyUrl, fetchOpts).then(function(r) {
-      return r.text().then(function(text) {
-        console.log('[neteaseApi 响应原文]', method, path, 'HTTP', r.status, '长度=' + text.length, text.substring(0, 600));
-        try {
-          var json = JSON.parse(text);
-          console.log('[neteaseApi 响应]', method, path, json);
-          return json;
-        } catch (e) {
-          console.error('[neteaseApi JSON解析失败]', text.substring(0, 600));
-          throw e;
-        }
-      });
-    });
-    // 加 20 秒超时：避免 VPS/网络慢导致请求无限挂起、界面"毫无反应"
-    var timeoutPromise = new Promise(function (resolve, reject) {
-      setTimeout(function () { reject(new Error('neteaseApi 请求超时: ' + path)); }, 20000);
-    });
-    return Promise.race([fetchPromise, timeoutPromise]).catch(function(e) {
-      console.error('[neteaseApi 失败]', method, path, e.message || e);
-      throw e;
-    });
-  }
-  
   // 从 Cookie 提取 __csrf
   function getNeCsrf() {
     if (!STATE.cookie) return '';
@@ -499,15 +456,10 @@
     }).catch(function () { return ''; });
   }
 
-  // 通过网易云官方API获取歌曲封面URL（通过VPS代理，避免CORS）
+  // 通过网易云官方API获取歌曲封面URL（已废弃，暂时保留以防兼容性问题）
   function getNeteaseCover(songId) {
-    return neteaseApi('/api/song/detail?ids=%5B' + encodeURIComponent(songId) + '%5D').then(function (data) {
-      if (data && data.code === 200 && data.songs && data.songs[0] && data.songs[0].al) {
-        // picUrl 返回 http://，HTTPS 页面混合内容会被拦截，必须升级为 https
-        return toHttps(data.songs[0].al.picUrl) || '';
-      }
-      return '';
-    }).catch(function () { return ''; });
+    console.warn('[getNeteaseCover] 此函数已废弃');
+    return Promise.resolve('');
   }
 
   // 通过 GD pic 接口把图片ID转成真实封面URL
@@ -3423,14 +3375,17 @@
         return;
       }
       if (!STATE.cookie) {
-        if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('请先在设置中填写网易云 Cookie');
+        if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('请先登录网易云账号');
         return;
       }
       STATE.isSearching = true;
       refs.neSearchResults.innerHTML = '<div class="rmp-loading"><div class="rmp-spinner"></div></div>';
-      neteaseApi('/api/search/get?s=' + encodeURIComponent(keywords) + '&type=1&limit=20').then(function(resp) {
+
+      // 使用新的 neteaseSearch API（照抄 SullyOS）
+      neteaseSearch(keywords, 20, 0).then(function(resp) {
         STATE.isSearching = false;
-        var result = resp.result || {};
+        // 解析返回格式：{ result: { songs: [...] } } 或 { songs: [...] }
+        var result = resp.result || resp;
         var songs = (result.songs || []).map(function(s) {
           var al = s.album || s.al || {};
           var ar = s.artists || s.ar || [];
@@ -3447,7 +3402,8 @@
         renderNeSearchResults();
       }).catch(function(e) {
         STATE.isSearching = false;
-        refs.neSearchResults.innerHTML = '<div class="rmp-empty-state">搜索失败，请检查Cookie或网络</div>';
+        refs.neSearchResults.innerHTML = '<div class="rmp-empty-state">搜索失败，请检查登录状态或网络</div>';
+        console.error('[网易云搜索失败]', e);
       });
     }
     if (refs.neSearchBtn) {
@@ -4031,14 +3987,18 @@
   // 获取网易云用户信息
   function fetchUserInfo() {
     if (!STATE.cookie) return Promise.resolve(null);
-    return neteaseApi('/api/nuser/account/get').then(function (data) {
-      if (data && data.profile) {
-        STATE.userProfile = data.profile;
+    // 使用新的 loginStatus API（照抄 SullyOS）
+    return loginStatus().then(function (data) {
+      if (data && data.data && data.data.profile) {
+        STATE.userProfile = data.data.profile;
         saveSettings();
-        return data.profile;
+        return data.data.profile;
       }
       return null;
-    }).catch(function () { return null; });
+    }).catch(function (e) {
+      console.error('[获取用户信息失败]', e);
+      return null;
+    });
   }
 
   // 更新网易云登录 UI
@@ -4071,13 +4031,14 @@
     var refs = STATE.appRefs;
     if (!refs.neRecsList) return;
     if (!STATE.cookie) {
-      refs.neRecsList.innerHTML = '<div class="rmp-empty-state">请先在设置中填写网易云 Cookie</div>';
+      refs.neRecsList.innerHTML = '<div class="rmp-empty-state">请先登录网易云账号</div>';
       return;
     }
     refs.neRecsList.innerHTML = '<div class="rmp-loading"><div class="rmp-spinner"></div></div>';
-    var csrf = getNeCsrf();
-    neteaseApi('/api/v3/discovery/recommend/songs?csrf_token=' + encodeURIComponent(csrf), '{}', 'POST').then(function(resp) {
-      var raw = (resp.data || {}).dailySongs || [];
+
+    // 使用新的 neteaseRecommendSongs API（照抄 SullyOS）
+    neteaseRecommendSongs().then(function(resp) {
+      var raw = (resp.data || {}).dailySongs || resp.recommend || [];
       var songs = raw.map(function(s) {
         var al = s.al || s.album || {};
         var ar = s.ar || s.artists || [];
@@ -4091,12 +4052,13 @@
         };
       });
       if (songs.length === 0) {
-        refs.neRecsList.innerHTML = '<div class="rmp-empty-state">今日暂无推荐，请确认Cookie有效</div>';
+        refs.neRecsList.innerHTML = '<div class="rmp-empty-state">今日暂无推荐，请确认登录状态</div>';
         return;
       }
       renderRecsList(songs);
-    }).catch(function() {
-      refs.neRecsList.innerHTML = '<div class="rmp-empty-state">加载失败，请检查Cookie是否有效</div>';
+    }).catch(function(e) {
+      console.error('[每日推荐失败]', e);
+      refs.neRecsList.innerHTML = '<div class="rmp-empty-state">加载失败，请检查登录状态</div>';
     });
   }
 
@@ -4172,19 +4134,20 @@
       refs.nePlaylists.innerHTML = html;
     }
 
-    // 先获取用户ID，再获取歌单
-    neteaseApi('/api/nuser/account/get').then(function(resp) {
-      var uid = (resp.profile || {}).userId;
+    // 先获取用户ID，再获取歌单（使用新的 API）
+    loginStatus().then(function(resp) {
+      var uid = (resp.data && resp.data.profile && resp.data.profile.userId) || (resp.profile && resp.profile.userId);
       if (!uid) {
-        refs.nePlaylists.innerHTML = '<div class="rmp-empty-state">获取用户信息失败，Cookie可能已过期</div>';
+        refs.nePlaylists.innerHTML = '<div class="rmp-empty-state">获取用户信息失败，请重新登录</div>';
         return;
       }
-      return neteaseApi('/api/user/playlist?uid=' + uid + '&limit=50&offset=0');
+      return neteaseUserPlaylist(uid);
     }).then(function(resp) {
       if (!resp) return;
       renderPls(resp.playlist || []);
-    }).catch(function() {
-      refs.nePlaylists.innerHTML = '<div class="rmp-empty-state">加载失败，请检查Cookie</div>';
+    }).catch(function(e) {
+      console.error('[加载歌单失败]', e);
+      refs.nePlaylists.innerHTML = '<div class="rmp-empty-state">加载失败，请检查登录状态</div>';
     });
   }
 
@@ -4192,21 +4155,23 @@
   function loadPlaylistSongs(plId) {
     var refs = STATE.appRefs;
     if (!STATE.cookie) {
-      refs.neSearchResults.innerHTML = '<div class="rmp-empty-state">请先设置Cookie</div>';
+      refs.neSearchResults.innerHTML = '<div class="rmp-empty-state">请先登录</div>';
       return;
     }
     refs.neSearchResults.innerHTML = '<div class="rmp-loading"><div class="rmp-spinner"></div></div>';
     refs.neSubnavBtns.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-nsub') === 'search'); });
     refs.neSubpanels.forEach(function(p) { p.classList.toggle('active', p.getAttribute('data-nsub') === 'search'); });
 
-    neteaseApi('/api/v6/playlist/detail?id=' + plId).then(function(resp) {
+    // 使用新的 neteasePlaylistDetail API
+    neteasePlaylistDetail(plId).then(function(resp) {
       var playlist = resp.playlist || {};
       var tracks = playlist.tracks || [];
       if (tracks.length === 0) {
         var trackIds = (playlist.trackIds || []).slice(0, 50);
         if (trackIds.length > 0) {
           var ids = trackIds.map(function(t) { return t.id; });
-          return neteaseApi('/api/song/detail?ids=' + JSON.stringify(ids));
+          // 使用新的 neteaseCall API
+          return neteaseCall('/song/detail', { ids: ids.join(',') });
         }
         return null;
       }
@@ -4661,17 +4626,16 @@
           // 模式 A：网易云个人账号（设置中 charSource === 'netease'）
           if (STATE.charSource === 'netease') {
             if (!STATE.cookie) {
-              return Promise.resolve({ success: false, message: '请先在设置中填写网易云 Cookie，或切换到第三方音乐源' });
+              return Promise.resolve({ success: false, message: '请先登录网易云账号，或切换到第三方音乐源' });
             }
-            // 用用户自己的网易云账号搜索（走 VPS 代理）
-            // 网易云搜索加超时（12 秒），避免 VPS 慢导致 char 长时间等待
-            var searchPromise = neteaseApi('/api/search/get?s=' + encodeURIComponent(keyword) + '&type=1&limit=' + limit);
+            // 用用户自己的网易云账号搜索（使用新的 neteaseSearch API）
+            var searchPromise = neteaseSearch(keyword, limit, 0);
             var timeoutPromise = new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 12000); });
             return Promise.race([searchPromise, timeoutPromise]).then(function (resp) {
               if (!resp) {
                 return { success: false, message: '网易云搜索超时，请稍后重试或切换第三方音乐源' };
               }
-              var result = resp.result ? resp.result : {};
+              var result = resp.result || resp;
               var songs = (result.songs || []).map(function (s) {
                 var al = s.album || s.al || {};
                 var ar = s.artists || s.ar || [];
