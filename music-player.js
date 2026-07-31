@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-06:00-v2.5.0-fix-flow';
+  var BUILD_TIME = '2026-08-01-07:00-v2.6.0-profile';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1021,6 +1021,148 @@
       row.appendChild(dur);
       STATE.appRefs.searchResults.appendChild(row);
     });
+  }
+
+  // ==================== 用户主页 UI ====================
+  function createProfileView() {
+    var container = document.createElement('div');
+    container.style.cssText = `
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, #ffffff 0%, ${C.bg} 50%, ${C.bgDeep} 100%);
+      display:flex;flex-direction:column;
+    `;
+
+    // 背景装饰
+    var bokeh = document.createElement('div');
+    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
+    bokeh.innerHTML = `
+      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
+        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+        animation:shizuku-float 8s ease-in-out infinite"></div>
+    `;
+    container.appendChild(bokeh);
+
+    // 头部
+    var header = document.createElement('div');
+    header.className = 'shizuku-glass-strong';
+    header.style.cssText = `
+      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+    `;
+
+    var title = document.createElement('div');
+    title.textContent = 'My Cloud';
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+
+    var rightBtns = document.createElement('div');
+    rightBtns.style.cssText = 'display:flex;gap:8px';
+
+    var searchBtn = document.createElement('button');
+    searchBtn.textContent = '🔍';
+    searchBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px`;
+    searchBtn.onclick = function() {
+      STATE.currentView = 'search';
+      createUI();
+    };
+    rightBtns.appendChild(searchBtn);
+
+    header.appendChild(title);
+    header.appendChild(rightBtns);
+    container.appendChild(header);
+
+    // 内容区
+    var content = document.createElement('div');
+    content.className = 'shizuku-scrollbar';
+    content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
+
+    // 用户信息卡片
+    var userCard = document.createElement('div');
+    userCard.className = 'shizuku-glass';
+    userCard.style.cssText = `
+      padding:16px;border-radius:20px;margin-bottom:16px;
+      display:flex;align-items:center;gap:16px;
+    `;
+
+    var avatar = document.createElement('img');
+    avatar.src = STATE.userProfile.avatarUrl || '';
+    avatar.style.cssText = `width:60px;height:60px;border-radius:50%;border:2px solid ${C.sakura}`;
+
+    var userInfo = document.createElement('div');
+    userInfo.style.cssText = 'flex:1';
+    userInfo.innerHTML = `
+      <div style="font-size:16px;font-weight:600;color:${C.text}">${STATE.userProfile.nickname || '用户'}</div>
+      <div style="font-size:11px;color:${C.muted};margin-top:4px">${STATE.userProfile.signature || '这个人很懒，什么都没写'}</div>
+    `;
+
+    userCard.appendChild(avatar);
+    userCard.appendChild(userInfo);
+    content.appendChild(userCard);
+
+    // 快捷按钮
+    var quickBtns = document.createElement('div');
+    quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px';
+
+    var btn1 = createQuickBtn('📅', '每日推荐', function() {
+      alert('每日推荐功能开发中');
+    });
+    var btn2 = createQuickBtn('📻', '私人FM', function() {
+      alert('私人FM功能开发中');
+    });
+    var btn3 = createQuickBtn('🎵', '我的歌单', function() {
+      STATE.currentView = 'playlist';
+      createUI();
+    });
+    var btn4 = createQuickBtn('🚪', '退出登录', logout);
+
+    quickBtns.appendChild(btn1);
+    quickBtns.appendChild(btn2);
+    quickBtns.appendChild(btn3);
+    quickBtns.appendChild(btn4);
+    content.appendChild(quickBtns);
+
+    container.appendChild(content);
+    STATE.appContainer.innerHTML = '';
+    STATE.appContainer.appendChild(container);
+  }
+
+  function createQuickBtn(emoji, text, onclick) {
+    var btn = document.createElement('button');
+    btn.className = 'shizuku-glass';
+    btn.style.cssText = `
+      padding:16px;border-radius:16px;border:none;cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;gap:8px;
+      transition:all 0.2s;
+    `;
+    btn.onmouseenter = function() {
+      btn.style.background = C.glass;
+      btn.style.boxShadow = '0 4px 20px ' + C.glow + '20';
+    };
+    btn.onmouseleave = function() {
+      btn.style.background = 'rgba(255,255,255,0.22)';
+      btn.style.boxShadow = 'none';
+    };
+    btn.onclick = onclick;
+    btn.innerHTML = `
+      <div style="font-size:24px">${emoji}</div>
+      <div style="font-size:11px;color:${C.primary}">${text}</div>
+    `;
+    return btn;
+  }
+
+  // ==================== 搜索页面 UI ====================
+  function createSearchView() {
+    // TODO: 实现搜索页面
+    alert('搜索页面开发中');
+    STATE.currentView = 'profile';
+    createUI();
+  }
+
+  // ==================== 播放器大页面 UI ====================
+  function createPlayerView() {
+    // TODO: 实现播放器大页面
+    alert('播放器大页面开发中');
+    STATE.currentView = 'profile';
+    createUI();
   }
 
   // ==================== 歌单视图 UI ====================
