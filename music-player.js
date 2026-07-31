@@ -593,22 +593,29 @@
 
   // 开始扫码登录流程
   function startQrLogin(loginState, qrBox) {
+    console.log('[开始获取二维码]');
     loginQrKey().then(function(keyRes) {
+      console.log('[loginQrKey 响应]', keyRes);
       var key = (keyRes.data && keyRes.data.unikey) || keyRes.unikey;
-      if (!key) throw new Error('无法获取 key');
+      if (!key) {
+        console.error('[无法获取 key]', keyRes);
+        throw new Error('无法获取 key');
+      }
       loginState.qrKey = key;
+      console.log('[获取到 key]', key);
       return loginQrCreate(key);
     }).then(function(createRes) {
+      console.log('[loginQrCreate 响应]', createRes);
       var img = (createRes.data && createRes.data.qrimg) || createRes.qrimg;
-      if (!img) throw new Error('无法生成二维码');
+      if (!img) {
+        console.error('[无法生成二维码]', createRes);
+        throw new Error('无法生成二维码');
+      }
       loginState.qrImg = img;
+      console.log('[获取到二维码图片]', img);
 
-      // 更新二维码显示
-      qrBox.innerHTML = '';
-      var qrImg = document.createElement('img');
-      qrImg.src = img;
-      qrImg.style.cssText = 'width:192px;height:192px;border-radius:12px;display:block';
-      qrBox.appendChild(qrImg);
+      // 重新渲染登录面板以显示二维码
+      createLoginPanel();
 
       // 开始轮询
       STATE.qrPollTimer = setInterval(function() {
@@ -631,6 +638,9 @@
             var musicU = m ? m[1] : '';
             if (musicU) {
               onLoggedIn('MUSIC_U=' + musicU);
+            } else {
+              console.error('[登录信息不完整]', r);
+              alert('登录信息不完整，请重试');
             }
           }
         }).catch(function(e) {
@@ -639,7 +649,9 @@
       }, 2500);
     }).catch(function(e) {
       console.error('[扫码失败]', e);
+      alert('扫码失败：' + e.message);
       loginState.qrStatus = 'idle';
+      createLoginPanel();
     });
   }
 
