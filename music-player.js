@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.17.0';
+  var BUILD_TIME = '2026-07-31-v1.18.0';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -39,7 +39,7 @@
     tlyrics: [],              // 解析后的翻译歌词 [{time, text}]
     currentLyricIndex: -1,    // 当前歌词行索引
     cookie: '',               // 网易云 cookie
-    backend: 'https://roche-netease-api.zxinyi404.workers.dev', // Cloudflare Worker - 网易云 API 代理
+    backend: 'https://netease-api.vercel.app', // 网易云 API 公开服务
     mcpBackend: 'https://ncm.chajianreader.cc.cd', // 网易云 MCP 服务器（HTTPS 直连腾讯云，扫码登录+开放平台API）
     mcpToken: '',             // MCP 服务器 accessToken（扫码登录后获取）
     defaultSource: 'netease', // 默认音源
@@ -550,19 +550,29 @@
     return fetch(url).then(function(r) { return r.json(); });
   }
 
-  // ==================== 网易云标准扫码登录 API（仿 SullyOS 实现）====================
+  // ==================== 网易云标准扫码登录 API（使用公开服务）====================
 
-  // 网易云 API 通用调用（通过 backend worker 代理）
-  function neteaseCall(path, body) {
-    var url = STATE.backend.replace(/\/+$/, '') + '/netease' + path;
+  // 网易云 API 通用调用（使用 NeteaseCloudMusicApi 服务）
+  function neteaseCall(path, params) {
+    // 使用标准的网易云 API 服务，路径格式：/login/qr/key
+    var url = STATE.backend.replace(/\/+$/, '') + path;
+
+    // 构建查询参数
+    var qs = '';
+    if (params && Object.keys(params).length > 0) {
+      qs = '?' + Object.keys(params).map(function(k) {
+        return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+      }).join('&');
+    }
+
     var headers = { 'Content-Type': 'application/json' };
     if (STATE.cookie) {
-      headers['X-Netease-Cookie'] = STATE.cookie;
+      headers['Cookie'] = STATE.cookie;
     }
-    return fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(body || {})
+
+    return fetch(url + qs, {
+      method: 'GET',
+      headers: headers
     }).then(function(res) {
       return res.json();
     });
@@ -570,17 +580,17 @@
 
   // 1. 获取二维码 key
   function loginQrKey() {
-    return neteaseCall('/login/qr/key', {});
+    return neteaseCall('/login/qr/key', { timestamp: Date.now() });
   }
 
   // 2. 创建二维码（返回 base64 图片）
   function loginQrCreate(key) {
-    return neteaseCall('/login/qr/create', { key: key, qrimg: true });
+    return neteaseCall('/login/qr/create', { key: key, qrimg: true, timestamp: Date.now() });
   }
 
   // 3. 检查扫码状态
   function loginQrCheck(key) {
-    return neteaseCall('/login/qr/check', { key: key });
+    return neteaseCall('/login/qr/check', { key: key, timestamp: Date.now() });
   }
 
   // ==================== 旧的 MCP 登录方式（备用）====================

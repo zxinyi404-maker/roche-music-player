@@ -1,10 +1,10 @@
 {
   "id": "roche-music-player",
   "name": "音乐播放器",
-  "version": "1.17.1",
-  "description": "✅ 标准网易云扫码登录已完成！使用自己的 Worker 后端，稳定可靠",
+  "version": "1.18.0",
+  "description": "✅ 改用公开网易云 API 服务，标准 GET 请求，扫码登录应该可以正常工作了",
   "author": "Roche (Fork by zxinyi404-maker)",
-  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.17.1/music-player.js",
+  "entry": "https://cdn.jsdelivr.net/gh/zxinyi404-maker/roche-music-player@v1.18.0/music-player.js",
   "hash": "",
   "permissions": ["storage", "ui", "memory:read"]
 }
