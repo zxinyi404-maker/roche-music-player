@@ -41,14 +41,15 @@
     roche: null,
     // 登录状态
     qrPollTimer: null,
-    currentView: 'main', // 'main' | 'login' | 'playlist'
+    currentView: 'profile', // 'profile' | 'search' | 'player' | 'playlist'
     // 歌词
     lyric: [],
     activeLyricIdx: -1,
-    // 用户歌单
+    // 用户数据
     userPlaylists: [],
     currentPlaylistSongs: [],
-    expandedPlaylistId: null
+    expandedPlaylistId: null,
+    signedIn: false
   };
 
   // ==================== 工具函数 ====================
@@ -261,8 +262,9 @@
   function onLoggedIn(cookie) {
     console.log('[登录成功]', cookie);
     STATE.cookie = cookie;
+    saveSettings(); // 立即保存 cookie
     fetchUserInfo().then(function() {
-      STATE.currentView = 'main';
+      STATE.currentView = 'profile'; // 改为 profile
       createUI(); // 重新渲染界面
     });
   }
@@ -1176,23 +1178,29 @@
     }
 
     // 根据当前视图决定渲染内容
-    if (STATE.currentView === 'login') {
-      createLoginPanel();
+    if (STATE.currentView === 'profile') {
+      createProfileView(); // 用户主页
+      return;
+    }
+
+    if (STATE.currentView === 'search') {
+      createSearchView(); // 搜索页面
       return;
     }
 
     if (STATE.currentView === 'playlist') {
-      createPlaylistView();
+      createPlaylistView(); // 歌单详情
       return;
     }
 
-    // 主界面（搜索 + 播放）
-    STATE.appContainer.style.cssText = `
-      width:100%;height:100%;
-      background:linear-gradient(180deg, ${C.bg} 0%, ${C.bgDeep} 100%);
-      color:${C.text};display:flex;flex-direction:column;
-      position:relative;overflow:hidden;
-    `;
+    if (STATE.currentView === 'player') {
+      createPlayerView(); // 播放器大页面
+      return;
+    }
+
+    // 默认显示用户主页
+    createProfileView();
+  }
 
     // 背景装饰
     var bokeh = document.createElement('div');
