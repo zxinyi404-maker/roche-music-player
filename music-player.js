@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-17:00-v3.2.2-debug';
+  var BUILD_TIME = '2026-08-01-18:00-v3.2.3-iosx';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -119,7 +119,7 @@
 /* iOS 安全区域适配 */
 @supports (padding: max(0px)) {
   .ios-safe-top { padding-top: max(15px, env(safe-area-inset-top)); }
-  .ios-safe-bottom { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .ios-safe-bottom { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
   .ios-safe-left { padding-left: max(0px, env(safe-area-inset-left)); }
   .ios-safe-right { padding-right: max(0px, env(safe-area-inset-right)); }
 }
@@ -1615,15 +1615,15 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   // 灵动岛播放器
   function createMiniPlayer() {
     var island = document.createElement('div');
-    island.className = 'ios-safe-top';
     island.style.cssText = `
-      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      position:fixed;top:0;left:50%;transform:translateX(-50%);
       background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);
       border-radius:32px;padding:8px 16px;
       display:flex;align-items:center;gap:12px;
       box-shadow:0 8px 32px rgba(0,0,0,0.3);
       z-index:1000;transition:all 0.3s ease;
       cursor:pointer;
+      margin-top:max(12px, calc(env(safe-area-inset-top) + 8px));
     `;
 
     // hover 效果
@@ -2111,7 +2111,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.2.2',
+      version: '3.2.3',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
