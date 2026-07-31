@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.19.0';
+  var BUILD_TIME = '2026-07-31-v1.20.0';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -248,18 +248,39 @@
     function pollSingle(src, retries, maxRetries) {
       retries = retries || 0;
       maxRetries = maxRetries || 4;
-      // 网易云走GD后端
+
+      // 网易云使用新的 neteaseSearch API（照抄 SullyOS）
       if (src === 'netease') {
-        return api('search', { source: src, keywords: keywords, limit: limit }).then(function (data) {
-          var songs = data.songs || data.results || [];
-          if (songs.length > 0) return songs.map(function (s) { return normalizeSong(s); });
+        return neteaseSearch(keywords, limit, 0).then(function (data) {
+          // 解析 SullyOS 格式的返回：{ result: { songs: [...] } } 或 { songs: [...] }
+          var songs = (data.result && data.result.songs) || data.songs || [];
+          if (songs.length > 0) {
+            // 转换成统一格式
+            return songs.map(function(s) {
+              var artists = s.artists || s.ar || [];
+              var artistName = artists.map(function(a) { return a.name; }).join(' / ');
+              var album = s.album || s.al || {};
+              var picUrl = album.picUrl || album.pic || '';
+              return normalizeSong({
+                id: String(s.id),
+                name: s.name,
+                artist: artistName,
+                singer: artistName,
+                picId: picUrl,
+                lyricId: String(s.id),
+                platform: 'netease',
+                source: 'netease'
+              });
+            });
+          }
           if (retries < maxRetries) {
             return new Promise(function (resolve) {
               setTimeout(function () { resolve(pollSingle(src, retries + 1, maxRetries)); }, 800 + retries * 400);
             });
           }
           return [];
-        }).catch(function () {
+        }).catch(function (err) {
+          console.error('[网易云搜索失败]', err);
           if (retries < maxRetries) {
             return new Promise(function (resolve) {
               setTimeout(function () { resolve(pollSingle(src, retries + 1, maxRetries)); }, 800 + retries * 400);
@@ -268,7 +289,8 @@
           return [];
         });
       }
-      // GD API 单源搜索
+
+      // 其他音源走旧的 GD API
       return api('search', { source: src, keywords: keywords, limit: limit }).then(function (data) {
         var songs = data.songs || data.results || [];
         if (songs.length > 0) return songs.map(function (s) { return normalizeSong(s); });
@@ -390,38 +412,47 @@
     }) : Promise.all(checks).then(process);
   }
 
-  // 获取播放 URL（统一走 Vercel 后端，支持所有音源）
+  // 获取播放 URL（网易云使用 SullyOS API，其他音源走旧后端）
   function getSongUrl(id, source, quality, isPersonal) {
     var cleanId = String(id).indexOf(':') >= 0 ? String(id).split(':').pop() : String(id);
     var br = quality || STATE.quality;
-    if (isPersonal && STATE.cookie && (source === 'netease')) {
-      // 播放 URL 缓存：10 分钟内同一首歌直接复用，避免重复请求 /play（VPS weapi 较慢）
+
+    // 网易云使用新的 neteaseSongUrl API（照抄 SullyOS）
+    if (source === 'netease') {
+      // 播放 URL 缓存：10 分钟内同一首歌直接复用
       var cacheKey = 'ne:' + cleanId;
       var cached = STATE.songUrlCache && STATE.songUrlCache[cacheKey];
       if (cached && cached.url && (Date.now() - cached.ts < 10 * 60 * 1000)) {
-        console.log('[getSongUrl 个人网易云-weapi] 命中缓存 songId=' + cleanId);
+        console.log('[getSongUrl 网易云] 命中缓存 songId=' + cleanId);
         return Promise.resolve(cached.url);
       }
-      // weapi 方案（NeteaseCloudMusicApi）：VPS /play 接口返回 weapi_url，
-      // weapi 生成的播放 URL 不绑定数据中心 IP（VPS 已验证可拉取 200）
-      var playUrl = STATE.mcpBackend.replace(/\/+$/, '') + '/play?id=' + encodeURIComponent(cleanId);
-      console.log('[getSongUrl 个人网易云-weapi] songId=' + cleanId + ' playUrl=' + playUrl);
-      return fetch(playUrl).then(function (r) { return r.json(); }).then(function (data) {
-        var weapiUrl = data && data.weapi_url ? data.weapi_url : '';
-        if (!weapiUrl) {
-          console.error('[getSongUrl 个人网易云-weapi] 未返回weapi_url', data);
+
+      console.log('[getSongUrl 网易云] songId=' + cleanId + ' quality=' + br);
+      return neteaseSongUrl(cleanId).then(function (data) {
+        // 解析 SullyOS 格式：{ data: [{ url: "..." }] } 或 { url: "..." }
+        var songData = (data.data && data.data[0]) || data;
+        var url = songData.url || '';
+
+        if (!url) {
+          console.error('[getSongUrl 网易云] 未返回播放地址', data);
           return '';
         }
-        // 经 VPS 代理拉取音频流（VPS 已验证可拉 200），前端流式播放
-        var url = STATE.mcpBackend.replace(/\/+$/, '') + '/proxy?url=' + encodeURIComponent(weapiUrl);
-        console.log('[getSongUrl 个人网易云-weapi] weapi_url=' + weapiUrl + ' proxy=' + url);
+
+        // 升级到 HTTPS
+        if (url.indexOf('http://') === 0) {
+          url = url.replace('http://', 'https://');
+        }
+
+        console.log('[getSongUrl 网易云] 成功获取 URL:', url.substring(0, 100));
         STATE.songUrlCache[cacheKey] = { url: url, ts: Date.now() };
         return url;
       }).catch(function (e) {
-        console.error('[getSongUrl 个人网易云-weapi] 失败', e.message || e);
+        console.error('[getSongUrl 网易云] 失败', e.message || e);
         return '';
       });
     }
+
+    // 其他音源走旧的 GD API
     return api('song_url', { id: cleanId, source: source, br: br }).then(function (data) {
       var url = data.url || '';
       if (url && url.indexOf('http://') === 0) url = url.replace('http://', 'https://');
@@ -523,17 +554,27 @@
     }
   }
 
-  // 获取歌词（统一走 Vercel 后端）
+  // 获取歌词（网易云使用 SullyOS API，其他音源走旧后端）
   function getLyric(lyricId, source, isPersonal) {
     if (!lyricId) return Promise.resolve({ lyric: '', tlyric: '' });
     var cleanId = String(lyricId).indexOf(':') >= 0 ? String(lyricId).split(':').pop() : String(lyricId);
-    if (isPersonal && STATE.cookie && (source === 'netease')) {
-      return neteaseApi('/api/song/lyric?id=' + encodeURIComponent(cleanId) + '&lv=1&kv=1&tv=-1').then(function(resp) {
+
+    // 网易云使用新的 neteaseLyric API（照抄 SullyOS）
+    if (source === 'netease') {
+      console.log('[getLyric 网易云] songId=' + cleanId);
+      return neteaseLyric(cleanId).then(function(resp) {
+        // 解析 SullyOS 格式：{ lrc: { lyric: "..." }, tlyric: { lyric: "..." } }
         var lrc = (resp.lrc || {}).lyric || '';
         var tlyric = (resp.tlyric || {}).lyric || '';
+        console.log('[getLyric 网易云] 成功获取歌词，长度:', lrc.length, '翻译长度:', tlyric.length);
         return { lyric: lrc, tlyric: tlyric };
+      }).catch(function(e) {
+        console.error('[getLyric 网易云] 失败', e.message || e);
+        return { lyric: '', tlyric: '' };
       });
     }
+
+    // 其他音源走旧的 GD API
     return api('lyric', { id: cleanId, source: source }).then(function (data) {
       return { lyric: data.lyric || data.lrc || '', tlyric: data.tlyric || '' };
     });
@@ -550,18 +591,15 @@
     return fetch(url).then(function(r) { return r.json(); });
   }
 
-  // ==================== 网易云标准扫码登录 API（照抄 SullyOS 实现）====================
+  // ==================== 网易云标准 API（完全照抄 SullyOS 实现）====================
 
-  // 网易云 API 通用调用（使用 NeteaseCloudMusicApi 服务，POST 请求）
+  // 网易云 API 通用调用（POST + /netease 路径）
   function neteaseCall(path, body) {
-    // 照抄 SullyOS: 使用 /netease 前缀 + POST 请求
     var url = STATE.backend.replace(/\/+$/, '') + '/netease' + path;
-
     var headers = { 'Content-Type': 'application/json' };
     if (STATE.cookie) {
       headers['X-Netease-Cookie'] = STATE.cookie;
     }
-
     return fetch(url, {
       method: 'POST',
       headers: headers,
@@ -571,19 +609,81 @@
     });
   }
 
-  // 1. 获取二维码 key
+  // === 登录相关 ===
   function loginQrKey() {
     return neteaseCall('/login/qr/key', {});
   }
 
-  // 2. 创建二维码（返回 base64 图片）
   function loginQrCreate(key) {
     return neteaseCall('/login/qr/create', { key: key, qrimg: true });
   }
 
-  // 3. 检查扫码状态
   function loginQrCheck(key) {
     return neteaseCall('/login/qr/check', { key: key });
+  }
+
+  function loginStatus() {
+    return neteaseCall('/login/status', {});
+  }
+
+  // === 搜索和歌曲相关 ===
+  function neteaseSearch(keyword, limit, offset) {
+    return neteaseCall('/search', {
+      keyword: keyword,
+      limit: limit || 30,
+      offset: offset || 0,
+      type: 1
+    });
+  }
+
+  function neteaseSongUrl(id) {
+    return neteaseCall('/song/url', {
+      id: id,
+      level: STATE.quality || 'standard'
+    });
+  }
+
+  function neteaseLyric(id) {
+    return neteaseCall('/lyric', { id: id });
+  }
+
+  // === 用户相关 ===
+  function neteaseUserDetail(uid) {
+    return neteaseCall('/user/detail', { uid: uid });
+  }
+
+  function neteaseUserPlaylist(uid) {
+    return neteaseCall('/user/playlist', { uid: uid, limit: 60 });
+  }
+
+  function neteaseUserRecord(uid, type) {
+    return neteaseCall('/user/record', { uid: uid, type: type || 1 });
+  }
+
+  // === 歌单相关 ===
+  function neteasePlaylistDetail(id) {
+    return neteaseCall('/playlist/detail', { id: id });
+  }
+
+  function neteasePlaylistTrackAll(id, limit, offset) {
+    return neteaseCall('/playlist/track/all', {
+      id: id,
+      limit: limit || 50,
+      offset: offset || 0
+    });
+  }
+
+  // === 推荐相关 ===
+  function neteaseRecommendSongs() {
+    return neteaseCall('/recommend/songs', {});
+  }
+
+  function neteasePersonalFm() {
+    return neteaseCall('/personal_fm', {});
+  }
+
+  function neteaseDailySignin(type) {
+    return neteaseCall('/daily_signin', { type: type || 1 });
   }
 
   // ==================== 旧的 MCP 登录方式（备用）====================
