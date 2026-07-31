@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-23:30-v1.21.0';
+  var BUILD_TIME = '2026-07-31-23:45-v1.21.1';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -4334,16 +4334,30 @@
               if (musicU) {
                 STATE.cookie = 'MUSIC_U=' + musicU;
                 saveSettings();
-                updateNeteaseLoginUI();
-                if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
                 console.log('[Cookie 已保存]', STATE.cookie);
 
-                clearInterval(STATE.qrPollTimer);
-                STATE.qrPollTimer = null;
-                setTimeout(function() {
-                  console.log('[关闭弹窗]');
-                  overlay.remove();
-                }, 1500);
+                // 获取用户信息后再更新 UI（重要！）
+                fetchUserInfo().then(function(profile) {
+                  console.log('[用户信息获取成功]', profile);
+                  updateNeteaseLoginUI();
+                  if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
+
+                  clearInterval(STATE.qrPollTimer);
+                  STATE.qrPollTimer = null;
+                  setTimeout(function() {
+                    console.log('[关闭弹窗]');
+                    overlay.remove();
+                  }, 1500);
+                }).catch(function(err) {
+                  console.error('[获取用户信息失败]', err);
+                  // 即使获取失败，也关闭弹窗
+                  if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('登录成功，但获取用户信息失败');
+                  clearInterval(STATE.qrPollTimer);
+                  STATE.qrPollTimer = null;
+                  setTimeout(function() {
+                    overlay.remove();
+                  }, 1500);
+                });
               } else {
                 qrStatus.textContent = '登录成功但未获取到 Cookie - 请截图控制台';
                 qrStatus.className = 'rmp-qr-status-el error';
