@@ -25,7 +25,7 @@
   } catch (e) {}
 
   // ==================== 全局状态 ====================
-  var BUILD_TIME = '2026-07-31-v1.17.0';
+  var BUILD_TIME = '2026-07-31-v1.16.10';
   var STATE = {
     roche: null,              // roche API 实例
     audio: null,              // 单个 HTMLAudioElement 实例
@@ -549,41 +549,6 @@
     if (qs) url += '?' + qs;
     return fetch(url).then(function(r) { return r.json(); });
   }
-
-  // ==================== 网易云标准扫码登录 API（仿 SullyOS 实现）====================
-
-  // 网易云 API 通用调用（通过 backend worker 代理）
-  function neteaseCall(path, body) {
-    var url = STATE.backend.replace(/\/+$/, '') + '/netease' + path;
-    var headers = { 'Content-Type': 'application/json' };
-    if (STATE.cookie) {
-      headers['X-Netease-Cookie'] = STATE.cookie;
-    }
-    return fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(body || {})
-    }).then(function(res) {
-      return res.json();
-    });
-  }
-
-  // 1. 获取二维码 key
-  function loginQrKey() {
-    return neteaseCall('/login/qr/key', {});
-  }
-
-  // 2. 创建二维码（返回 base64 图片）
-  function loginQrCreate(key) {
-    return neteaseCall('/login/qr/create', { key: key, qrimg: true });
-  }
-
-  // 3. 检查扫码状态
-  function loginQrCheck(key) {
-    return neteaseCall('/login/qr/check', { key: key });
-  }
-
-  // ==================== 旧的 MCP 登录方式（备用）====================
 
   function getQrLogin() {
     return mcpApi('login/start');
@@ -4139,7 +4104,7 @@
     if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('已退出网易云登录');
   }
 
-  // 网易云扫码登录（标准 API 实现，仿 SullyOS）
+  // 网易云扫码登录（动态创建弹窗）
   function startQrLogin() {
     // 清除旧弹窗
     var oldModal = document.querySelector('.rmp-qr-modal');
@@ -4174,101 +4139,67 @@
       if (STATE.qrPollTimer) { clearInterval(STATE.qrPollTimer); STATE.qrPollTimer = null; }
     });
 
-    // 使用标准网易云 API 三步走
-    // 步骤 1: 获取二维码 key
-    loginQrKey().then(function (keyRes) {
-      var key = keyRes && (keyRes.data && keyRes.data.unikey || keyRes.unikey);
-      if (!key) {
-        qrPlaceholder.textContent = '获取二维码 key 失败';
-        qrStatus.textContent = keyRes && keyRes.message ? keyRes.message : '请检查网络或 backend 配置';
+    getQrLogin().then(function (data) {
+      if (!data || !data.qr_url) {
+        qrPlaceholder.textContent = '获取二维码失败';
+        qrStatus.textContent = data && data.raw && data.raw.message ? data.raw.message : '请检查网络';
         qrStatus.className = 'rmp-qr-status-el error';
         return;
       }
+      var qrUrl = data.qr_url;
+      var qrImgSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+      qrImg.src = qrImgSrc;
+      qrImg.style.display = 'block';
+      qrPlaceholder.style.display = 'none';
+      qrStatus.innerHTML = '请用<strong>网易云音乐 APP</strong>扫码<br><a href="' + qrUrl + '" target="_blank" style="color:#6cf;">手机上打不开？点此链接</a>';
+      qrStatus.className = 'rmp-qr-status-el';
 
-      // 步骤 2: 创建二维码图片
-      loginQrCreate(key).then(function (createRes) {
-        var qrImgData = createRes && (createRes.data && createRes.data.qrimg || createRes.qrimg);
-        if (!qrImgData) {
-          qrPlaceholder.textContent = '生成二维码失败';
-          qrStatus.textContent = createRes && createRes.message ? createRes.message : '请检查 backend';
-          qrStatus.className = 'rmp-qr-status-el error';
+      STATE.qrPollTimer = setInterval(function () {
+        if (!document.body.contains(overlay)) {
+          clearInterval(STATE.qrPollTimer);
+          STATE.qrPollTimer = null;
           return;
         }
-
-        // 显示二维码（base64 图片）
-        qrImg.src = qrImgData;
-        qrImg.style.display = 'block';
-        qrPlaceholder.style.display = 'none';
-        qrStatus.innerHTML = '请用<strong>网易云音乐 APP</strong>扫码登录';
-        qrStatus.className = 'rmp-qr-status-el';
-
-        // 步骤 3: 轮询检查扫码状态
-        STATE.qrPollTimer = setInterval(function () {
-          if (!document.body.contains(overlay)) {
+        checkQrLogin().then(function (result) {
+          if (!result) return;
+          if (result.logged_in) {
+            qrStatus.textContent = '登录成功！';
+            qrStatus.className = 'rmp-qr-status-el success';
+            if (result.access_token) {
+              STATE.mcpToken = result.access_token;
+              saveSettings();
+            }
+            if (result.user_info && result.user_info.nickname) {
+              STATE.userProfile = result.user_info;
+              STATE.roche.storage.set('rmp_user_profile', JSON.stringify(result.user_info));
+              updateNeteaseLoginUI();
+              if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功：' + result.user_info.nickname);
+            } else {
+              updateNeteaseLoginUI();
+              if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功');
+            }
             clearInterval(STATE.qrPollTimer);
             STATE.qrPollTimer = null;
-            return;
-          }
-
-          loginQrCheck(key).then(function (checkRes) {
-            if (!checkRes) return;
-            var code = checkRes.code;
-
-            // 800: 二维码过期
-            if (code === 800) {
-              qrStatus.textContent = '二维码已过期，请刷新重试';
+            setTimeout(function() { overlay.remove(); }, 1500);
+          } else {
+            var raw = result.raw || {};
+            if (raw.code === 800) {
+              qrStatus.textContent = '二维码已过期，请重新获取';
               qrStatus.className = 'rmp-qr-status-el error';
               clearInterval(STATE.qrPollTimer);
               STATE.qrPollTimer = null;
-            }
-            // 801: 等待扫码
-            else if (code === 801) {
-              qrStatus.textContent = '等待扫码...';
+            } else if (raw.code === 802) {
+              qrStatus.textContent = '待确认，请在手机上点击确认登录';
               qrStatus.className = 'rmp-qr-status-el';
             }
-            // 802: 已扫码，等待确认
-            else if (code === 802) {
-              qrStatus.textContent = '已扫描，请在手机上确认登录';
-              qrStatus.className = 'rmp-qr-status-el';
-            }
-            // 803: 登录成功
-            else if (code === 803) {
-              qrStatus.textContent = '登录成功！';
-              qrStatus.className = 'rmp-qr-status-el success';
-
-              // 提取 cookie
-              var cookie = checkRes.cookie || '';
-              var match = cookie.match(/MUSIC_U=([^;]+)/i);
-              var musicU = match ? match[1] : '';
-
-              if (musicU) {
-                STATE.cookie = 'MUSIC_U=' + musicU;
-                saveSettings();
-                updateNeteaseLoginUI();
-                if (STATE.roche && STATE.roche.ui) STATE.roche.ui.toast('网易云登录成功！');
-              } else {
-                qrStatus.textContent = '登录成功但未获取到 Cookie';
-                qrStatus.className = 'rmp-qr-status-el error';
-              }
-
-              clearInterval(STATE.qrPollTimer);
-              STATE.qrPollTimer = null;
-              setTimeout(function() { overlay.remove(); }, 1500);
-            }
-          }).catch(function (err) {
-            console.error('[扫码轮询错误]', err);
-          });
-        }, 2500);
-
-      }).catch(function (err) {
-        qrPlaceholder.textContent = '创建二维码失败';
-        qrStatus.textContent = '错误: ' + (err.message || '未知错误');
-        qrStatus.className = 'rmp-qr-status-el error';
-      });
-
-    }).catch(function (err) {
+          }
+        }).catch(function () {
+          // 忽略轮询错误
+        });
+      }, 2000);
+    }).catch(function () {
       qrPlaceholder.textContent = '获取二维码失败';
-      qrStatus.textContent = '错误: ' + (err.message || '请求失败，检查网络');
+      qrStatus.textContent = '请求失败，请检查网络';
       qrStatus.className = 'rmp-qr-status-el error';
     });
   }
