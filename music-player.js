@@ -101,6 +101,22 @@
 .shizuku-glass-strong{background:rgba(255,255,255,0.45);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.5)}
 .shizuku-scrollbar::-webkit-scrollbar{width:3px}
 .shizuku-scrollbar::-webkit-scrollbar-thumb{background:${C.faint}60;border-radius:3px}
+
+/* iOS 安全区域适配 */
+@supports (padding: max(0px)) {
+  .ios-safe-top { padding-top: max(15px, env(safe-area-inset-top)); }
+  .ios-safe-bottom { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .ios-safe-left { padding-left: max(0px, env(safe-area-inset-left)); }
+  .ios-safe-right { padding-right: max(0px, env(safe-area-inset-right)); }
+}
+
+/* iOS 触摸优化 */
+* { -webkit-tap-highlight-color: transparent; }
+button, input, textarea { -webkit-appearance: none; }
+input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
+
+/* iOS 滚动优化 */
+.shizuku-scrollbar { -webkit-overflow-scrolling: touch; }
 `;
     document.head.appendChild(style);
   }
@@ -437,7 +453,7 @@
 
     // 头部
     var header = document.createElement('div');
-    header.className = 'shizuku-glass-strong';
+    header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
       padding:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
@@ -1177,7 +1193,7 @@
 
     // 头部
     var header = document.createElement('div');
-    header.className = 'shizuku-glass-strong';
+    header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
       padding:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
@@ -1205,7 +1221,7 @@
 
     // 内容区
     var content = document.createElement('div');
-    content.className = 'shizuku-scrollbar';
+    content.className = 'shizuku-scrollbar ios-safe-bottom';
     content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
 
     // 用户信息卡片
@@ -1322,7 +1338,7 @@
 
     // 头部
     var header = document.createElement('div');
-    header.className = 'shizuku-glass-strong';
+    header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
       padding:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
@@ -1495,6 +1511,7 @@
   // 灵动岛播放器
   function createMiniPlayer() {
     var island = document.createElement('div');
+    island.className = 'ios-safe-top';
     island.style.cssText = `
       position:fixed;top:12px;left:50%;transform:translateX(-50%);
       background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);
@@ -1614,7 +1631,7 @@
 
     // 头部
     var header = document.createElement('div');
-    header.className = 'shizuku-glass-strong';
+    header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
       padding:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
@@ -1817,7 +1834,7 @@
 
     // 头部
     var header = document.createElement('div');
-    header.className = 'shizuku-glass-strong';
+    header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
       padding:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
@@ -1841,7 +1858,7 @@
 
     // 内容区
     var content = document.createElement('div');
-    content.className = 'shizuku-scrollbar';
+    content.className = 'shizuku-scrollbar ios-safe-bottom';
     content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
 
     if (STATE.expandedPlaylistId && STATE.currentPlaylistSongs.length > 0) {
