@@ -1579,45 +1579,90 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // 创建歌曲行
   function createSongRow(song, idx) {
-    var row = document.createElement('div');
+    var isActive = STATE.currentSong && STATE.currentSong.id === song.id;
+    var isVip = song.fee && song.fee === 1;
+
+    var row = document.createElement('button');
     row.style.cssText = `
-      display:flex;align-items:center;gap:12px;padding:10px 12px;margin-bottom:6px;
-      border-radius:16px;cursor:pointer;transition:all 0.2s;
-      background:${STATE.currentSong && STATE.currentSong.id === song.id ? C.glass : 'rgba(255,255,255,0.08)'};
+      width:100%;display:flex;align-items:center;gap:12px;
+      padding:10px 12px;border-radius:16px;border:none;cursor:pointer;
+      margin-bottom:6px;transition:all 0.3s ease;text-align:left;
+      background:${isActive ? `linear-gradient(135deg, rgba(255,255,255,0.25), rgba(137,212,255,0.15))` : 'rgba(255,255,255,0.08)'};
+      backdrop-filter:${isActive ? 'blur(12px) saturate(1.4)' : 'none'};
+      -webkit-backdrop-filter:${isActive ? 'blur(12px) saturate(1.4)' : 'none'};
+      border:${isActive ? `1.5px solid rgba(255,255,255,0.4)` : '1.5px solid transparent'};
+      box-shadow:${isActive ? `0 2px 16px ${C.glow}15` : 'none'};
     `;
+
     row.onmouseenter = function() {
-      row.style.background = 'linear-gradient(135deg, ' + C.glass + ', rgba(137,212,255,0.15))';
-      row.style.boxShadow = '0 2px 16px ' + C.glow + '15';
+      if (!isActive) {
+        row.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(137,212,255,0.1))';
+        row.style.transform = 'translateX(4px)';
+      }
     };
     row.onmouseleave = function() {
-      row.style.background = STATE.currentSong && STATE.currentSong.id === song.id ? C.glass : 'rgba(255,255,255,0.08)';
-      row.style.boxShadow = 'none';
+      if (!isActive) {
+        row.style.background = 'rgba(255,255,255,0.08)';
+        row.style.transform = 'translateX(0)';
+      }
     };
+
     row.onclick = function() {
       STATE.playlist = STATE.searchResults;
       STATE.currentIndex = idx;
       playSong(song);
-      createUI(); // 重新渲染以显示迷你播放器
+      createUI();
     };
+
+    var coverBox = document.createElement('div');
+    coverBox.style.cssText = 'position:relative;flex-shrink:0';
 
     var img = document.createElement('img');
     img.src = song.pic;
-    img.style.cssText = 'width:44px;height:44px;border-radius:12px;object-fit:cover;border:1.5px solid ' + C.faint + '40';
+    img.style.cssText = `width:44px;height:44px;border-radius:12px;object-fit:cover;border:1.5px solid ${isActive ? C.accent + '60' : C.faint + '40'}`;
+    coverBox.appendChild(img);
+
+    if (isActive) {
+      var sparkle = document.createElement('div');
+      sparkle.style.cssText = 'position:absolute;top:-2px;right:-2px;width:8px;height:8px;opacity:0.7;animation:shizuku-twinkle 2.5s ease-in-out 0s infinite';
+      sparkle.innerHTML = '<svg width="8" height="8" viewBox="0 0 20 20" fill="' + C.glow + '"><path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8 Z"/></svg>';
+      coverBox.appendChild(sparkle);
+    }
+
+    row.appendChild(coverBox);
 
     var info = document.createElement('div');
     info.style.cssText = 'flex:1;min-width:0';
-    info.innerHTML = `
-      <div style="font-size:13px;color:${C.text};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.name}</div>
-      <div style="font-size:11px;color:${C.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${song.artist}</div>
-    `;
+
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = `display:flex;align-items:center;gap:6px;font-size:14px;color:${C.text}`;
+
+    if (isVip) {
+      var vipBadge = document.createElement('span');
+      vipBadge.textContent = 'VIP';
+      vipBadge.style.cssText = `font-size:8px;padding:1px 6px;border-radius:10px;color:white;font-weight:600;background:linear-gradient(135deg, #daa855, #e0b88a);letter-spacing:0.05em;flex-shrink:0`;
+      titleBox.appendChild(vipBadge);
+    }
+
+    var title = document.createElement('span');
+    title.textContent = song.name;
+    title.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400';
+    titleBox.appendChild(title);
+
+    info.appendChild(titleBox);
+
+    var subtitle = document.createElement('div');
+    subtitle.textContent = song.artist;
+    subtitle.style.cssText = `font-size:11px;color:${C.muted};margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+    info.appendChild(subtitle);
+
+    row.appendChild(info);
 
     var dur = document.createElement('div');
     dur.textContent = formatTime(song.duration);
-    dur.style.cssText = 'font-size:10px;color:' + C.faint;
-
-    row.appendChild(img);
-    row.appendChild(info);
+    dur.style.cssText = `font-size:10px;color:${C.faint};font-family:monospace;flex-shrink:0`;
     row.appendChild(dur);
+
     return row;
   }
 
