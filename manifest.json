@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.2.3",
-  "description": "📱 优化 iPhone X 适配：灵动岛避开刘海 + 底部横条增加间距",
+  "version": "3.3.0",
+  "description": "✨ 完整美化：照抄SullyOS动画效果（浮动、漂移、闪烁、波纹、发光）",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-18:00-v3.2.3-iosx';
+  var BUILD_TIME = '2026-08-01-19:00-v3.3.0-beauty';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -104,17 +104,21 @@
     var style = document.createElement('style');
     style.id = '__shizuku_music';
     style.textContent = `
-@keyframes shizuku-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
-@keyframes shizuku-twinkle{0%,100%{opacity:.3}50%{opacity:.9}}
-@keyframes shizuku-glow{0%,100%{box-shadow:0 0 15px ${C.glow}40}50%{box-shadow:0 0 25px ${C.glow}80}}
+@keyframes shizuku-float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-18px) scale(1.08)}}
+@keyframes shizuku-drift{0%{transform:translateX(0) translateY(0) rotate(0deg)}25%{transform:translateX(12px) translateY(-10px) rotate(5deg)}50%{transform:translateX(-6px) translateY(-20px) rotate(-3deg)}75%{transform:translateX(8px) translateY(-8px) rotate(4deg)}100%{transform:translateX(0) translateY(0) rotate(0deg)}}
+@keyframes shizuku-twinkle{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:.9;transform:scale(1.2)}}
+@keyframes shizuku-ripple{0%{transform:scale(0);opacity:.6}100%{transform:scale(4);opacity:0}}
+@keyframes shizuku-glow{0%,100%{box-shadow:0 0 15px ${C.glow}30,0 0 40px ${C.glow}10}50%{box-shadow:0 0 25px ${C.glow}50,0 0 60px ${C.glow}20}}
 @keyframes shizuku-vinyl{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes shizuku-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes shizuku-drop{0%{transform:translateY(-30px) scale(0);opacity:0}40%{opacity:.7}100%{transform:translateY(100vh) scale(1);opacity:0}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes wave{0%,100%{height:8px}50%{height:16px}}
-.shizuku-glass{background:rgba(255,255,255,0.22);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.35)}
-.shizuku-glass-strong{background:rgba(255,255,255,0.45);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.5)}
+.shizuku-glass{background:rgba(255,255,255,0.22);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border:1px solid rgba(255,255,255,0.35)}
+.shizuku-glass-strong{background:rgba(255,255,255,0.45);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,0.5)}
 .shizuku-scrollbar::-webkit-scrollbar{width:3px}
 .shizuku-scrollbar::-webkit-scrollbar-thumb{background:${C.faint}60;border-radius:3px}
+.shizuku-scrollbar::-webkit-scrollbar-track{background:transparent}
 
 /* iOS 安全区域适配 */
 @supports (padding: max(0px)) {
@@ -2111,7 +2115,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.2.3',
+      version: '3.3.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
