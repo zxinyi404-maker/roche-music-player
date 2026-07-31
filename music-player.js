@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-15:00-v3.2.0-proxy';
+  var BUILD_TIME = '2026-08-01-16:00-v3.2.1-loginfix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -50,7 +50,20 @@
     userPlaylists: [],
     currentPlaylistSongs: [],
     expandedPlaylistId: null,
-    signedIn: false
+    signedIn: false,
+    // 登录面板状态（持久化）
+    loginState: {
+      mode: 'qr',
+      qrKey: '',
+      qrImg: '',
+      qrStatus: 'idle',
+      phone: '',
+      captcha: '',
+      cooldown: 0,
+      sending: false,
+      loggingIn: false,
+      manualCookie: ''
+    }
   };
 
   // ==================== 工具函数 ====================
@@ -431,18 +444,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // ==================== 登录面板 UI ====================
   function createLoginPanel() {
-    var loginState = {
-      mode: 'qr', // 'qr' | 'phone' | 'manual'
-      qrKey: '',
-      qrImg: '',
-      qrStatus: 'idle', // 'idle' | 'waiting' | 'scanned' | 'expired' | 'done'
-      phone: '',
-      captcha: '',
-      cooldown: 0,
-      sending: false,
-      loggingIn: false,
-      manualCookie: ''
-    };
+    var loginState = STATE.loginState; // 使用全局持久化的状态
 
     var container = document.createElement('div');
     container.style.cssText = `
@@ -2106,7 +2108,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.2.0',
+      version: '3.2.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
