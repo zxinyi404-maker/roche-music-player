@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-03:00-v2.2.0-playmode';
+  var BUILD_TIME = '2026-08-01-04:00-v2.3.0-lyric';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -41,7 +41,10 @@
     roche: null,
     // 登录状态
     qrPollTimer: null,
-    currentView: 'main' // 'main' | 'login'
+    currentView: 'main', // 'main' | 'login'
+    // 歌词
+    lyric: [],
+    activeLyricIdx: -1
   };
 
   // ==================== 工具函数 ====================
@@ -54,6 +57,26 @@
     var m = Math.floor(seconds / 60);
     var s = Math.floor(seconds % 60);
     return m + ':' + (s < 10 ? '0' + s : s);
+  }
+
+  // 解析歌词 - 完全照抄 SullyOS
+  function parseLyric(txt) {
+    if (!txt) return [];
+    var out = [];
+    var re = /\[(\d+):(\d+)(?:\.(\d+))?\](.*)/;
+    var lines = txt.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var m = re.exec(lines[i]);
+      if (!m) continue;
+      var mm = parseInt(m[1], 10);
+      var ss = parseInt(m[2], 10);
+      var ms = m[3] ? parseInt(m[3].padEnd(3, '0').slice(0, 3), 10) : 0;
+      var text = m[4].trim();
+      if (!text) continue;
+      out.push({ t: mm * 60 + ss + ms / 1000, text: text });
+    }
+    out.sort(function(a, b) { return a.t - b.t; });
+    return out;
   }
 
   // ==================== CSS 注入 ====================
@@ -630,6 +653,18 @@
   function playSong(song) {
     console.log('[播放]', song.name);
     STATE.currentSong = song;
+    STATE.lyric = [];
+    STATE.activeLyricIdx = -1;
+
+    // 获取歌词
+    neteaseLyric(song.id).then(function(data) {
+      STATE.lyric = parseLyric((data.lrc && data.lrc.lyric) || '');
+      console.log('[歌词]', STATE.lyric.length + ' 行');
+    }).catch(function(e) {
+      console.error('[获取歌词失败]', e);
+    });
+
+    // 获取播放地址
     neteaseSongUrl(song.id).then(data => {
       var url = toHttps((data.data && data.data[0] || data).url);
       if (!url) return console.error('[无播放地址]');
@@ -688,7 +723,41 @@
       STATE.appRefs.songArtist.textContent = STATE.currentSong.artist;
       STATE.appRefs.albumCover.src = STATE.currentSong.pic;
       STATE.appRefs.playerSection.style.display = 'flex';
+      renderLyrics();
     }
+  }
+
+  function renderLyrics() {
+    if (!STATE.appRefs.lyricContainer) return;
+    var container = STATE.appRefs.lyricContainer;
+    container.innerHTML = '';
+
+    if (STATE.lyric.length === 0) {
+      var emptyMsg = document.createElement('div');
+      emptyMsg.textContent = '暂无歌词';
+      emptyMsg.style.cssText = `color:${C.faint};font-size:12px;padding:40px 0;font-style:italic`;
+      container.appendChild(emptyMsg);
+      return;
+    }
+
+    // 渲染所有歌词行
+    STATE.lyric.forEach(function(line, idx) {
+      var lyricLine = document.createElement('div');
+      lyricLine.className = 'lyric-line';
+      lyricLine.textContent = line.text;
+      lyricLine.style.cssText = `
+        padding:8px 12px;font-size:14px;line-height:1.6;
+        transition:all 0.3s ease;color:${C.muted};
+        cursor:pointer;
+      `;
+      // 点击歌词跳转到对应时间
+      lyricLine.onclick = function() {
+        if (STATE.audio) {
+          STATE.audio.currentTime = line.t;
+        }
+      };
+      container.appendChild(lyricLine);
+    });
   }
 
   function updatePlayBtn() {
@@ -776,6 +845,43 @@
     STATE.appRefs.progressFill.style.width = pct + '%';
     STATE.appRefs.currentTimeLabel.textContent = formatTime(STATE.currentTime);
     STATE.appRefs.durationLabel.textContent = formatTime(STATE.duration);
+
+    // 更新当前歌词行
+    if (STATE.lyric.length > 0) {
+      var idx = -1;
+      for (var k = 0; k < STATE.lyric.length; k++) {
+        if (STATE.lyric[k].t <= STATE.currentTime) {
+          idx = k;
+        } else {
+          break;
+        }
+      }
+      if (idx !== STATE.activeLyricIdx) {
+        STATE.activeLyricIdx = idx;
+        updateLyricDisplay();
+      }
+    }
+  }
+
+  function updateLyricDisplay() {
+    if (!STATE.appRefs.lyricContainer) return;
+    var container = STATE.appRefs.lyricContainer;
+
+    // 高亮当前行
+    var lines = container.querySelectorAll('.lyric-line');
+    for (var i = 0; i < lines.length; i++) {
+      if (i === STATE.activeLyricIdx) {
+        lines[i].style.color = C.primary;
+        lines[i].style.fontWeight = '600';
+        lines[i].style.transform = 'scale(1.05)';
+        // 滚动到当前行
+        lines[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        lines[i].style.color = C.muted;
+        lines[i].style.fontWeight = '400';
+        lines[i].style.transform = 'scale(1)';
+      }
+    }
   }
 
   // ==================== 搜索功能 ====================
@@ -1126,10 +1232,19 @@
     subActions.appendChild(playModeBtn);
     subActions.appendChild(volumeBox);
 
+    // 歌词显示区域
+    var lyricContainer = document.createElement('div');
+    lyricContainer.className = 'shizuku-scrollbar';
+    lyricContainer.style.cssText = `
+      max-height:200px;overflow-y:auto;padding:16px;margin-top:16px;
+      text-align:center;scroll-behavior:smooth;
+    `;
+
     playerSection.appendChild(nowPlayingBox);
     playerSection.appendChild(progressBox);
     playerSection.appendChild(controls);
     playerSection.appendChild(subActions);
+    playerSection.appendChild(lyricContainer);
 
     main.appendChild(header);
     main.appendChild(searchBox);
@@ -1141,7 +1256,7 @@
     STATE.appRefs = {
       searchInput, searchResults, playerSection, albumCover, songName, songArtist,
       progressBar, progressFill, currentTimeLabel, durationLabel, playBtn,
-      playModeBtn, nowPlaying: songInfo
+      playModeBtn, lyricContainer, nowPlaying: songInfo
     };
   }
 
