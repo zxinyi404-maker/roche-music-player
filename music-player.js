@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-16:00-v3.2.1-loginfix';
+  var BUILD_TIME = '2026-08-01-17:00-v3.2.2-debug';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -444,6 +444,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // ==================== 登录面板 UI ====================
   function createLoginPanel() {
+    console.log('[createLoginPanel] 开始渲染，当前模式:', STATE.loginState.mode);
     var loginState = STATE.loginState; // 使用全局持久化的状态
 
     var container = document.createElement('div');
@@ -519,7 +520,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         background:${loginState.mode === m.k ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'transparent'};
       `;
       btn.onclick = function() {
+        console.log('[标签切换] 从', loginState.mode, '切换到', m.k);
         loginState.mode = m.k;
+        console.log('[标签切换] 新模式:', loginState.mode);
         createLoginPanel(); // 重新渲染
       };
       modeSwitcher.appendChild(btn);
@@ -2108,7 +2111,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.2.1',
+      version: '3.2.2',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
