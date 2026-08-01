@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-06:15-v3.14.1-fix-timing';
+  var BUILD_TIME = '2026-08-02-07:00-v3.15.0-player-redesign';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -2277,6 +2277,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   }
 
   // ==================== 播放器大页面 UI ====================
+  // ==================== 播放器页面 UI（完全照抄 SullyOS）====================
   function createPlayerView() {
     if (!STATE.currentSong) {
       STATE.currentView = 'profile';
@@ -2294,18 +2295,23 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     // 背景装饰
     container.appendChild(createBokehBg());
 
-    // 头部 - 带装饰
+    // 头部 - 照抄 SullyOS MizuHeader
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
-      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
-      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+      padding-left:15px;padding-right:15px;padding-bottom:15px;
+      display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:20;
     `;
 
     var backBtn = document.createElement('button');
     backBtn.className = 'shizuku-btn-hover';
-    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%`;
-    backBtn.appendChild(svg('chevron-left', 20, C.primary));
+    backBtn.style.cssText = `
+      width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+      border:none;background:transparent;cursor:pointer;color:${C.primary};
+      border-radius:50%;transition:all 0.2s;
+    `;
+    backBtn.appendChild(svg('chevron-left', 16, C.primary));
     backBtn.onclick = function() {
       STATE.currentView = 'search';
       createUI();
@@ -2314,12 +2320,17 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var titleBox = document.createElement('div');
     titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
     titleBox.appendChild(sparkle(7, C.glow, 0));
+    titleBox.appendChild(waterDrop(5));
 
     var title = document.createElement('div');
     title.textContent = 'Now Playing';
-    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    title.style.cssText = `
+      font-size:12px;letter-spacing:0.2em;font-weight:300;
+      color:${C.primary};font-family:'Georgia',serif;
+    `;
     titleBox.appendChild(title);
 
+    titleBox.appendChild(waterDrop(5));
     titleBox.appendChild(sparkle(7, C.sakura, 1.2));
 
     header.appendChild(backBtn);
@@ -2327,110 +2338,290 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     header.appendChild(document.createElement('div')); // placeholder
     container.appendChild(header);
 
-    // 主内容区
+    // 主内容区 - 完全照抄 SullyOS 布局
     var content = document.createElement('div');
     content.className = 'ios-safe-bottom';
-    content.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;padding:20px;overflow:hidden;position:relative;z-index:10';
+    content.style.cssText = `
+      flex:1;display:flex;flex-direction:column;align-items:center;
+      padding:20px 20px 16px 20px;overflow:hidden;position:relative;z-index:10;
+    `;
 
-    // 唱片封面（带旋转动画）- 更精致的设计
+    // ========== 唱片（照抄 SullyOS VinylDisc）==========
     var vinylBox = document.createElement('div');
-    vinylBox.style.cssText = 'position:relative;margin-top:20px';
+    vinylBox.style.cssText = 'position:relative;margin-top:8px;flex-shrink:0';
 
+    var vinylSize = 150;
+    var vinylOuter = document.createElement('div');
+    vinylOuter.style.cssText = `position:relative;width:${vinylSize}px;height:${vinylSize}px`;
+
+    // 柔光光晕
+    var softGlow = document.createElement('div');
+    softGlow.style.cssText = `
+      position:absolute;inset:${-vinylSize * 0.08}px;border-radius:50%;pointer-events:none;
+      background:radial-gradient(circle, ${C.glow}30 0%, ${C.glow}10 50%, transparent 75%);
+      filter:blur(20px);
+    `;
+    vinylOuter.appendChild(softGlow);
+
+    // 唱片本体
     var vinyl = document.createElement('div');
     vinyl.style.cssText = `
-      width:200px;height:200px;border-radius:50%;
-      background:linear-gradient(135deg, ${C.bgDeep}, ${C.bg});
-      box-shadow:0 8px 32px rgba(0,0,0,0.15),inset 0 0 0 8px rgba(255,255,255,0.1),
-                 0 0 0 1px ${C.faint}30;
-      display:flex;align-items:center;justify-content:center;
-      animation:${STATE.isPlaying ? 'shizuku-vinyl 3s linear infinite' : 'none'};
-      position:relative;
+      position:relative;width:100%;height:100%;border-radius:50%;overflow:hidden;
+      animation:${STATE.isPlaying ? 'shizuku-vinyl 18s linear infinite' : 'none'};
+      border:1.5px solid rgba(255,255,255,0.6);
+      box-shadow:0 8px 32px ${C.primary}20, 0 0 0 1px ${C.glow}30;
     `;
 
-    // 内圈光晕
-    var innerGlow = document.createElement('div');
-    innerGlow.style.cssText = `
-      position:absolute;inset:0;border-radius:50%;
-      box-shadow:inset 0 0 30px ${C.glow}20;
-      pointer-events:none;
-    `;
-    vinyl.appendChild(innerGlow);
-
+    // 专辑封面
     var albumCover = document.createElement('img');
-    albumCover.src = STATE.currentSong.pic;
-    albumCover.style.cssText = `
-      width:160px;height:160px;border-radius:50%;
-      object-fit:cover;position:relative;z-index:2;
-      box-shadow:0 4px 16px rgba(0,0,0,0.2),0 0 0 2px rgba(255,255,255,0.3);
-    `;
-
+    albumCover.src = STATE.currentSong.pic || STATE.currentSong.albumPic;
+    albumCover.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
     vinyl.appendChild(albumCover);
 
-    // Bitrate 标签 - 照抄 SullyOS
-    if (STATE.currentSong.bitrate) {
-      var bitrateLabel = document.createElement('div');
-      bitrateLabel.className = 'shizuku-glass';
-      bitrateLabel.style.cssText = `
-        position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-        padding:2px 8px;border-radius:12px;font-size:9px;color:${C.primary};
-        border:1px solid ${C.primary}30;font-weight:600;letter-spacing:0.05em;
-        pointer-events:none;z-index:3;
-      `;
-      var bitrateMap = {
-        'standard': '128 kbps',
-        'higher': '192 kbps',
-        'exhigh': '320 kbps',
-        'lossless': '1411 kbps',
-        'hires': '24bit · Hi-Res'
-      };
-      bitrateLabel.textContent = bitrateMap[STATE.quality] || STATE.quality || '128 kbps';
-      vinyl.appendChild(bitrateLabel);
-    }
+    // 中心标签（不旋转）
+    var centerLabel = document.createElement('div');
+    centerLabel.style.cssText = `
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      pointer-events:none;
+    `;
+    var centerCircle = document.createElement('div');
+    centerCircle.style.cssText = `
+      width:${vinylSize * 0.34}px;height:${vinylSize * 0.34}px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.95), ${C.soft});
+      border:1px solid rgba(255,255,255,0.85);
+      box-shadow:inset 0 2px 6px rgba(255,255,255,0.6), 0 2px 8px ${C.primary}20;
+    `;
+    var centerDot = document.createElement('div');
+    centerDot.style.cssText = `
+      width:${vinylSize * 0.04}px;height:${vinylSize * 0.04}px;border-radius:50%;
+      background:${C.muted};
+      box-shadow:inset 0 1px 2px rgba(0,0,0,0.2);
+    `;
+    centerCircle.appendChild(centerDot);
+    centerLabel.appendChild(centerCircle);
+    vinyl.appendChild(centerLabel);
 
-    // 播放时的星芒装饰
-    if (STATE.isPlaying) {
-      var topSparkle = sparkle(10, C.glow, 0);
-      topSparkle.style.position = 'absolute';
-      topSparkle.style.top = '-8px';
-      topSparkle.style.left = '50%';
-      topSparkle.style.transform = 'translateX(-50%)';
-      vinylBox.appendChild(topSparkle);
+    // 表面反光
+    var highlight = document.createElement('div');
+    highlight.style.cssText = `
+      position:absolute;inset:0;pointer-events:none;border-radius:50%;
+      background:linear-gradient(135deg, transparent 35%, rgba(255,255,255,0.12) 50%, transparent 65%);
+    `;
+    vinyl.appendChild(highlight);
 
-      var rightSparkle = sparkle(8, C.sakura, 0.8);
-      rightSparkle.style.position = 'absolute';
-      rightSparkle.style.top = '50%';
-      rightSparkle.style.right = '-8px';
-      rightSparkle.style.transform = 'translateY(-50%)';
-      vinylBox.appendChild(rightSparkle);
+    vinylOuter.appendChild(vinyl);
 
-      var leftSparkle = sparkle(8, C.lavender, 1.5);
-      leftSparkle.style.position = 'absolute';
-      leftSparkle.style.top = '50%';
-      leftSparkle.style.left = '-8px';
-      leftSparkle.style.transform = 'translateY(-50%)';
-      vinylBox.appendChild(leftSparkle);
-    }
+    // Bitrate 徽章
+    var bitrateMap = {
+      'standard': '128 kbps',
+      'higher': '192 kbps',
+      'exhigh': '320 kbps',
+      'lossless': '1411 kbps',
+      'hires': '24bit · Hi-Res'
+    };
+    var bitrateBadge = document.createElement('div');
+    bitrateBadge.className = 'shizuku-glass-strong';
+    bitrateBadge.textContent = bitrateMap[STATE.quality] || '320 kbps';
+    bitrateBadge.style.cssText = `
+      position:absolute;bottom:-8px;right:-8px;
+      padding:2px 8px;border-radius:4px;
+      font-size:9px;color:${C.primary};
+      font-family:'Space Grotesk','SF Mono',monospace;
+      letter-spacing:0.18em;
+      border:1px solid ${C.primary}20;
+    `;
+    vinylOuter.appendChild(bitrateBadge);
 
-    vinylBox.appendChild(vinyl);
+    // 装饰星芒（照抄 SullyOS）
+    var sparkle1 = sparkle(11, C.glow, 0);
+    sparkle1.style.position = 'absolute';
+    sparkle1.style.top = '-8px';
+    sparkle1.style.right = '12px';
+    vinylOuter.appendChild(sparkle1);
+
+    var sparkle2 = sparkle(9, C.sakura, 0.8);
+    sparkle2.style.position = 'absolute';
+    sparkle2.style.top = '25%';
+    sparkle2.style.left = '-14px';
+    vinylOuter.appendChild(sparkle2);
+
+    var sparkle3 = sparkle(7, C.lavender, 1.5);
+    sparkle3.style.position = 'absolute';
+    sparkle3.style.bottom = '-4px';
+    sparkle3.style.left = '28px';
+    vinylOuter.appendChild(sparkle3);
+
+    var sparkle4 = sparkle(6, C.glow, 2.2);
+    sparkle4.style.position = 'absolute';
+    sparkle4.style.top = '58%';
+    sparkle4.style.right = '-12px';
+    vinylOuter.appendChild(sparkle4);
+
+    var drop1 = waterDrop(6);
+    drop1.style.position = 'absolute';
+    drop1.style.top = '60%';
+    drop1.style.right = '-14px';
+    vinylOuter.appendChild(drop1);
+
+    var drop2 = waterDrop(5);
+    drop2.style.position = 'absolute';
+    drop2.style.top = '12%';
+    drop2.style.left = '18%';
+    vinylOuter.appendChild(drop2);
+
+    vinylBox.appendChild(vinylOuter);
     content.appendChild(vinylBox);
 
-    // 歌曲信息
-    var songInfo = document.createElement('div');
-    songInfo.style.cssText = 'margin-top:24px;text-align:center;width:100%';
-    songInfo.innerHTML = `
-      <div style="font-size:18px;font-weight:600;color:${C.text};margin-bottom:8px">${STATE.currentSong.name}</div>
-      <div style="font-size:13px;color:${C.muted}">${STATE.currentSong.artist}</div>
+    // ========== 歌曲信息（照抄 SullyOS）==========
+    var songInfo = document.createElement('section');
+    songInfo.style.cssText = `
+      margin-top:20px;text-align:center;flex-shrink:0;
+      padding:0 8px;width:100%;
     `;
+
+    var songName = document.createElement('h2');
+    songName.textContent = STATE.currentSong.name;
+    songName.style.cssText = `
+      font-size:22px;font-weight:300;letter-spacing:-0.01em;
+      line-height:1.3;color:${C.primary};
+      font-family:'Noto Serif','Georgia',serif;
+      margin:0 0 6px 0;
+    `;
+    songInfo.appendChild(songName);
+
+    var songArtist = document.createElement('p');
+    songArtist.textContent = STATE.currentSong.artists || STATE.currentSong.artist;
+    songArtist.style.cssText = `
+      font-size:10px;text-transform:uppercase;opacity:0.7;
+      color:${C.muted};margin:0;
+      font-family:'Space Grotesk','SF Mono',monospace;
+      letter-spacing:0.2em;
+    `;
+    songInfo.appendChild(songArtist);
+
     content.appendChild(songInfo);
 
-    // 进度条
-    var progressBox = document.createElement('div');
-    progressBox.style.cssText = 'width:100%;margin-top:24px';
+    // ========== 歌词区域（照抄 SullyOS）==========
+    var lyricBox = document.createElement('div');
+    lyricBox.className = 'shizuku-scrollbar';
+    lyricBox.style.cssText = `
+      flex:1;width:100%;min-height:0;overflow-y:auto;text-align:center;
+      scroll-behavior:smooth;margin:12px 0;
+      mask-image:linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+      -webkit-mask-image:linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+    `;
+
+    if (STATE.lyric.length === 0) {
+      var emptyLyric = document.createElement('div');
+      emptyLyric.style.cssText = `
+        padding-top:24px;display:flex;flex-direction:column;align-items:center;gap:8px;
+        color:${C.faint};
+      `;
+      emptyLyric.appendChild(sparkle(12, C.glow, 0));
+      var emptyText = document.createElement('span');
+      emptyText.textContent = STATE.loadingSong ? 'loading...' : 'no lyrics';
+      emptyText.style.cssText = `
+        font-size:11px;font-style:italic;letter-spacing:0.1em;
+        font-family:'Noto Serif','Georgia',serif;
+      `;
+      emptyLyric.appendChild(emptyText);
+      lyricBox.appendChild(emptyLyric);
+    } else {
+      var lyricInner = document.createElement('div');
+      lyricInner.style.cssText = 'padding:32px 8px';
+
+      STATE.lyric.forEach(function(line, idx) {
+        var isActive = idx === STATE.activeLyricIdx;
+        var lyricLine = document.createElement('div');
+        lyricLine.setAttribute('data-lyric-idx', idx);
+        lyricLine.style.cssText = `
+          transition:transform 0.3s, opacity 0.3s;
+          transform:${isActive ? 'scale(1.05)' : 'scale(1)'};
+          opacity:${isActive ? '1' : '0.45'};
+          margin-bottom:16px;cursor:pointer;
+          transform-origin:center center;
+        `;
+        lyricLine.onclick = function() {
+          if (STATE.audio) STATE.audio.currentTime = line.t;
+        };
+
+        var lineBox = document.createElement('div');
+        lineBox.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px';
+
+        // 左侧星芒
+        var leftStar = document.createElement('div');
+        leftStar.style.cssText = `opacity:${isActive ? '1' : '0'};transition:opacity 0.3s`;
+        leftStar.appendChild(sparkle(12, C.sakura, 0));
+        lineBox.appendChild(leftStar);
+
+        // 歌词文本
+        var textDiv = document.createElement('div');
+        textDiv.textContent = line.text;
+        textDiv.style.cssText = `
+          font-size:16px;line-height:1.4;font-weight:400;
+          font-family:'Noto Serif','Georgia',serif;
+          max-width:100%;word-break:break-word;
+        `;
+        if (isActive) {
+          textDiv.style.background = `linear-gradient(135deg, ${C.primary} 0%, ${C.accent} 50%, #9a6bc5 100%)`;
+          textDiv.style.webkitBackgroundClip = 'text';
+          textDiv.style.webkitTextFillColor = 'transparent';
+          textDiv.style.backgroundClip = 'text';
+          textDiv.style.filter = `drop-shadow(0 0 14px ${C.glow}a0) drop-shadow(0 0 4px ${C.sakura}80)`;
+        } else {
+          textDiv.style.color = C.faint;
+        }
+        lineBox.appendChild(textDiv);
+
+        // 右侧星芒
+        var rightStar = document.createElement('div');
+        rightStar.style.cssText = `opacity:${isActive ? '1' : '0'};transition:opacity 0.3s`;
+        rightStar.appendChild(sparkle(12, C.lavender, 0.9));
+        lineBox.appendChild(rightStar);
+
+        lyricLine.appendChild(lineBox);
+        lyricInner.appendChild(lyricLine);
+      });
+
+      lyricBox.appendChild(lyricInner);
+    }
+    content.appendChild(lyricBox);
+
+    // ========== 进度条（照抄 SullyOS GlassProgress）==========
+    var progressSection = document.createElement('div');
+    progressSection.style.cssText = 'width:100%;max-width:420px;flex-shrink:0';
+
+    var timeLabels = document.createElement('div');
+    timeLabels.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:8px;padding:0 2px';
+
+    var currentTimeLabel = document.createElement('span');
+    currentTimeLabel.className = 'shizuku-glass';
+    currentTimeLabel.textContent = '0:00';
+    currentTimeLabel.style.cssText = `
+      padding:2px 8px;font-size:9px;letter-spacing:0.15em;
+      color:${C.primary};font-family:'Space Grotesk','SF Mono',monospace;
+      border:1px solid ${C.faint}40;
+    `;
+
+    var durationLabel = document.createElement('span');
+    durationLabel.className = 'shizuku-glass';
+    durationLabel.textContent = '0:00';
+    durationLabel.style.cssText = `
+      padding:2px 8px;font-size:9px;letter-spacing:0.15em;
+      color:${C.primary};font-family:'Space Grotesk','SF Mono',monospace;
+      border:1px solid ${C.faint}40;
+    `;
+
+    timeLabels.appendChild(currentTimeLabel);
+    timeLabels.appendChild(durationLabel);
+    progressSection.appendChild(timeLabels);
 
     var progressBar = document.createElement('div');
+    progressBar.className = 'shizuku-glass';
     progressBar.style.cssText = `
-      width:100%;height:6px;border-radius:3px;
-      background:${C.faint}30;position:relative;cursor:pointer;
+      width:100%;height:6px;border-radius:3px;position:relative;cursor:pointer;
+      box-shadow:inset 0 1px 3px rgba(0,0,0,0.06);
     `;
     progressBar.onclick = function(e) {
       var rect = this.getBoundingClientRect();
@@ -2440,231 +2631,169 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     var progressFill = document.createElement('div');
     progressFill.style.cssText = `
-      height:100%;border-radius:3px;
-      background:linear-gradient(90deg, ${C.primary}, ${C.accent});
-      width:0%;transition:width 0.1s;
+      position:absolute;top:0;left:0;height:100%;border-radius:3px;
+      width:0%;transition:width 0.15s;
+      background:linear-gradient(90deg, ${C.primary}, ${C.glow});
+      box-shadow:0 0 10px ${C.glow}40;
     `;
     progressBar.appendChild(progressFill);
 
-    var timeLabels = document.createElement('div');
-    timeLabels.style.cssText = 'display:flex;justify-content:space-between;margin-top:8px';
-    var currentTimeLabel = document.createElement('span');
-    currentTimeLabel.textContent = '0:00';
-    currentTimeLabel.style.cssText = `font-size:11px;color:${C.muted};font-family:monospace`;
-    var durationLabel = document.createElement('span');
-    durationLabel.textContent = '0:00';
-    durationLabel.style.cssText = `font-size:11px;color:${C.muted};font-family:monospace`;
-    timeLabels.appendChild(currentTimeLabel);
-    timeLabels.appendChild(durationLabel);
+    // 水滴指示点
+    var progressDot = document.createElement('div');
+    progressDot.style.cssText = `
+      position:absolute;top:50%;left:0%;
+      transform:translate(-50%, -50%);
+      transition:left 0.15s;
+      pointer-events:none;
+    `;
+    var dot = document.createElement('div');
+    dot.style.cssText = `
+      width:12px;height:12px;border-radius:50%;
+      background:radial-gradient(circle at 35% 35%, white, ${C.glow});
+      box-shadow:0 0 8px ${C.glow}60;
+    `;
+    progressDot.appendChild(dot);
+    progressBar.appendChild(progressDot);
 
-    progressBox.appendChild(progressBar);
-    progressBox.appendChild(timeLabels);
-    content.appendChild(progressBox);
+    progressSection.appendChild(progressBar);
+    content.appendChild(progressSection);
 
-    // 控制按钮 - 更精致的设计
+    // ========== 播放控制按钮（照抄 SullyOS PlayControls）==========
     var controls = document.createElement('div');
-    controls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:32px;margin-top:24px';
+    controls.style.cssText = `
+      display:flex;align-items:center;justify-content:center;gap:32px;
+      margin-top:12px;margin-bottom:4px;flex-shrink:0;position:relative;
+    `;
+
+    // 装饰星芒
+    var ctrlSparkle1 = sparkle(9, C.sakura, 0);
+    ctrlSparkle1.style.position = 'absolute';
+    ctrlSparkle1.style.top = '4px';
+    ctrlSparkle1.style.left = '30%';
+    controls.appendChild(ctrlSparkle1);
+
+    var ctrlSparkle2 = sparkle(7, C.lavender, 1.2);
+    ctrlSparkle2.style.position = 'absolute';
+    ctrlSparkle2.style.top = '12px';
+    ctrlSparkle2.style.right = '28%';
+    controls.appendChild(ctrlSparkle2);
 
     var prevBtn = document.createElement('button');
-    prevBtn.className = 'shizuku-btn-hover';
     prevBtn.style.cssText = `
-      padding:12px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);
+      padding:8px;border-radius:50%;border:none;background:transparent;
       cursor:pointer;color:${C.muted};transition:all 0.2s;
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
     `;
-    prevBtn.appendChild(svg('skip-back', 28, C.muted));
+    prevBtn.appendChild(svg('skip-back', 22, C.muted));
     prevBtn.onclick = playPrev;
-    prevBtn.onmouseenter = function() {
-      this.style.background = 'rgba(255,255,255,0.25)';
-      this.style.transform = 'scale(1.05)';
-    };
-    prevBtn.onmouseleave = function() {
-      this.style.background = 'rgba(255,255,255,0.15)';
-      this.style.transform = 'scale(1)';
-    };
 
     var playBtn = document.createElement('button');
-    playBtn.className = 'shizuku-btn-hover';
     playBtn.style.cssText = `
       width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;
       display:flex;align-items:center;justify-content:center;position:relative;
       background:linear-gradient(135deg, ${C.primary}, ${C.accent});
-      box-shadow:0 4px 20px ${C.glow}40;transition:all 0.2s;
+      box-shadow:0 4px 24px ${C.glow}40, 0 0 60px ${C.glow}15;
+      transition:transform 0.2s;
+      animation:${STATE.isPlaying ? 'shizuku-glow 3s ease-in-out infinite' : 'none'};
     `;
     playBtn.onmousedown = function() { this.style.transform = 'scale(0.95)'; };
     playBtn.onmouseup = function() { this.style.transform = 'scale(1)'; };
-    playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 28, 'white'));
+    playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 22, 'white'));
     playBtn.onclick = togglePlay;
 
-    // 播放按钮的光晕动画
-    if (STATE.isPlaying) {
-      playBtn.style.animation = 'shizuku-glow 2s ease-in-out infinite';
-    }
+    // 外圈装饰
+    var outerRing = document.createElement('div');
+    outerRing.style.cssText = `
+      position:absolute;inset:-3px;border-radius:50%;pointer-events:none;
+      border:1px solid rgba(255,255,255,0.2);
+    `;
+    playBtn.appendChild(outerRing);
 
     var nextBtn = document.createElement('button');
-    nextBtn.className = 'shizuku-btn-hover';
     nextBtn.style.cssText = `
-      padding:12px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);
+      padding:8px;border-radius:50%;border:none;background:transparent;
       cursor:pointer;color:${C.muted};transition:all 0.2s;
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
     `;
-    nextBtn.appendChild(svg('skip-forward', 28, C.muted));
+    nextBtn.appendChild(svg('skip-forward', 22, C.muted));
     nextBtn.onclick = playNext;
-    nextBtn.onmouseenter = function() {
-      this.style.background = 'rgba(255,255,255,0.25)';
-      this.style.transform = 'scale(1.05)';
-    };
-    nextBtn.onmouseleave = function() {
-      this.style.background = 'rgba(255,255,255,0.15)';
-      this.style.transform = 'scale(1)';
-    };
 
     controls.appendChild(prevBtn);
     controls.appendChild(playBtn);
     controls.appendChild(nextBtn);
     content.appendChild(controls);
 
-    // 次要操作栏（喜欢、播放模式、音量）
+    // ========== 子操作行（照抄 SullyOS SubActions）==========
     var subActions = document.createElement('div');
-    subActions.style.cssText = 'display:flex;align-items:center;gap:16px;margin-top:20px';
+    subActions.style.cssText = `
+      display:flex;items-end;justify-content:around;gap:16px;
+      max-width:280px;margin:12px auto 0 auto;flex-shrink:0;
+    `;
 
     // 喜欢按钮
     var isLiked = STATE.likedSongs.indexOf(STATE.currentSong.id) >= 0;
-    var likeBtn = document.createElement('button');
-    likeBtn.className = 'shizuku-btn-hover';
-    likeBtn.style.cssText = `
-      padding:8px;border-radius:50%;border:none;
-      background:${isLiked ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'rgba(255,255,255,0.1)'};
-      cursor:pointer;color:${isLiked ? 'white' : C.muted};transition:all 0.2s;
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    `;
-    likeBtn.innerHTML = isLiked ? '❤️' : '🤍';
-    likeBtn.onclick = function() {
-      toggleLike(STATE.currentSong.id).then(function() {
-        createUI(); // 重新渲染
-      }).catch(function() {});
-    };
+    var likeBtn = createSubActionBtn(
+      isLiked ? '❤️' : '🤍',
+      'Like',
+      function() {
+        toggleLike(STATE.currentSong.id).then(function() {
+          createUI();
+        }).catch(function() {});
+      },
+      isLiked
+    );
     subActions.appendChild(likeBtn);
 
     // 播放模式按钮
-    var modeBtn = document.createElement('button');
-    modeBtn.className = 'shizuku-btn-hover';
-    modeBtn.style.cssText = `
-      padding:8px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);
-      cursor:pointer;color:${C.muted};transition:all 0.2s;
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    `;
-    var modeIcon = STATE.playMode === 'loop' ? '🔁' : STATE.playMode === 'single' ? '🔂' : '🔀';
-    modeBtn.textContent = modeIcon;
-    modeBtn.onclick = function() {
-      cyclePlayMode();
-      createUI();
-    };
+    var playModeLabel = { 'loop': 'Loop', 'single': 'One', 'shuffle': 'Mix' };
+    var modeBtn = createSubActionBtn(
+      '🔁',
+      playModeLabel[STATE.playMode] || 'Loop',
+      cyclePlayMode,
+      STATE.playMode !== 'loop'
+    );
     subActions.appendChild(modeBtn);
 
-    // 音量控制
-    var volumeBox = document.createElement('div');
-    volumeBox.style.cssText = 'flex:1;display:flex;align-items:center;gap:8px';
-
-    var volumeIcon = document.createElement('div');
-    volumeIcon.textContent = '🔊';
-    volumeIcon.style.cssText = 'font-size:14px';
-    volumeBox.appendChild(volumeIcon);
-
-    var volumeSlider = document.createElement('input');
-    volumeSlider.type = 'range';
-    volumeSlider.min = '0';
-    volumeSlider.max = '100';
-    volumeSlider.value = String(Math.round(STATE.volume * 100));
-    volumeSlider.style.cssText = `
-      flex:1;height:4px;border-radius:2px;
-      background:rgba(255,255,255,0.2);outline:none;
-      -webkit-appearance:none;appearance:none;
-    `;
-    volumeSlider.oninput = function() {
-      setVolume(parseInt(this.value) / 100);
-    };
-    volumeBox.appendChild(volumeSlider);
-
-    subActions.appendChild(volumeBox);
     content.appendChild(subActions);
 
-    // 歌词显示（滚动）
-    var lyricBox = document.createElement('div');
-    lyricBox.className = 'shizuku-scrollbar';
-    lyricBox.style.cssText = `
-      flex:1;width:100%;margin-top:24px;overflow-y:auto;text-align:center;
-      mask-image:linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
-      -webkit-mask-image:linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
-    `;
-
-    if (STATE.lyric.length === 0) {
-      var emptyLyric = document.createElement('div');
-      emptyLyric.style.cssText = `padding:40px 0;color:${C.faint}`;
-
-      // 星芒装饰
-      var sparkleDecor = sparkle(24, C.glow, 0);
-      sparkleDecor.style.display = 'block';
-      sparkleDecor.style.margin = '0 auto 12px';
-      emptyLyric.appendChild(sparkleDecor);
-
-      var emptyText = document.createElement('div');
-      emptyText.textContent = '暂无歌词';
-      emptyText.style.cssText = `font-size:11px;font-style:italic;font-family:'Georgia',serif`;
-      emptyLyric.appendChild(emptyText);
-
-      lyricBox.appendChild(emptyLyric);
-    } else {
-      STATE.lyric.forEach(function(line, idx) {
-        var lyricLine = document.createElement('div');
-        lyricLine.className = 'lyric-line';
-        lyricLine.textContent = line.text;
-        var isActive = idx === STATE.activeLyricIdx;
-        lyricLine.style.cssText = `
-          padding:10px 12px;font-size:${isActive ? '16px' : '14px'};
-          line-height:1.6;transition:all 0.3s ease;
-          color:${isActive ? C.primary : C.muted};
-          font-weight:${isActive ? '600' : '400'};
-          cursor:pointer;position:relative;
-        `;
-
-        // 当前行添加星芒装饰
-        if (isActive) {
-          var leftStar = sparkle(6, C.sakura, 0);
-          leftStar.style.position = 'absolute';
-          leftStar.style.left = '8px';
-          leftStar.style.top = '50%';
-          leftStar.style.transform = 'translateY(-50%)';
-          lyricLine.appendChild(leftStar);
-
-          var rightStar = sparkle(6, C.sakura, 0.5);
-          rightStar.style.position = 'absolute';
-          rightStar.style.right = '8px';
-          rightStar.style.top = '50%';
-          rightStar.style.transform = 'translateY(-50%)';
-          lyricLine.appendChild(rightStar);
-        }
-
-        lyricLine.onclick = function() {
-          if (STATE.audio) STATE.audio.currentTime = line.t;
-        };
-        lyricBox.appendChild(lyricLine);
-      });
-    }
-
-    content.appendChild(lyricBox);
     container.appendChild(content);
 
-    // 保存引用以便更新
-    STATE.appRefs.playerProgressBar = progressBar;
-    STATE.appRefs.playerProgressFill = progressFill;
-    STATE.appRefs.playerCurrentTime = currentTimeLabel;
-    STATE.appRefs.playerDuration = durationLabel;
-    STATE.appRefs.playerPlayBtn = playBtn;
-    STATE.appRefs.playerLyricBox = lyricBox;
+    // 保存 refs 用于更新
+    STATE.appRefs.progressFill = progressFill;
+    STATE.appRefs.progressDot = progressDot;
+    STATE.appRefs.currentTimeLabel = currentTimeLabel;
+    STATE.appRefs.durationLabel = durationLabel;
+    STATE.appRefs.playBtn = playBtn;
+    STATE.appRefs.lyricContainer = lyricBox;
 
     STATE.appContainer.innerHTML = '';
     STATE.appContainer.appendChild(container);
+  }
+
+  // 辅助函数：创建子操作按钮
+  function createSubActionBtn(icon, label, onClick, active) {
+    var btn = document.createElement('button');
+    btn.style.cssText = `
+      display:flex;flex-direction:column;align-items:center;gap:4px;
+      transition:opacity 0.2s;opacity:${active ? '1' : '0.5'};
+      background:none;border:none;cursor:pointer;padding:4px;
+    `;
+    btn.onclick = onClick;
+    btn.onmousedown = function() { this.style.transform = 'scale(0.95)'; };
+    btn.onmouseup = function() { this.style.transform = 'scale(1)'; };
+
+    var iconBox = document.createElement('div');
+    iconBox.style.cssText = 'display:flex;align-items:center;justify-content:center;width:32px;height:32px';
+    iconBox.textContent = icon;
+    btn.appendChild(iconBox);
+
+    var labelText = document.createElement('span');
+    labelText.textContent = label;
+    labelText.style.cssText = `
+      font-size:8px;text-transform:uppercase;letter-spacing:0.15em;
+      color:${C.primary};font-family:'Space Grotesk','SF Mono',monospace;
+    `;
+    btn.appendChild(labelText);
+
+    return btn;
   }
 
   // ==================== 歌单视图 UI ====================
