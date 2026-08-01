@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.17.6",
-  "description": "🔧 修复 API 调用：添加 HTTP 状态检查（照抄 SullyOS）",
+  "version": "3.18.0",
+  "description": "⚙️ 添加后端地址配置：可更换网易云 API 服务器",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

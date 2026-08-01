@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-11:00-v3.17.6-fix-api-check';
+  var BUILD_TIME = '2026-08-02-11:15-v3.18.0-backend-config';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -3141,6 +3141,66 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
 
     content.appendChild(qualitySection);
+
+    // 后端地址设置
+    var backendSection = document.createElement('div');
+    backendSection.className = 'shizuku-glass';
+    backendSection.style.cssText = 'padding:16px;border-radius:20px;margin-bottom:16px';
+
+    var backendTitle = document.createElement('div');
+    backendTitle.textContent = '后端地址';
+    backendTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:8px`;
+    backendSection.appendChild(backendTitle);
+
+    var backendDesc = document.createElement('div');
+    backendDesc.textContent = '如果遇到"upstream fetch failed"错误，可尝试更换后端';
+    backendDesc.style.cssText = `font-size:10px;color:${C.muted};margin-bottom:12px;line-height:1.4`;
+    backendSection.appendChild(backendDesc);
+
+    var backendInput = document.createElement('input');
+    backendInput.type = 'text';
+    backendInput.value = STATE.backend;
+    backendInput.placeholder = 'https://sullymeow.ccwu.cc';
+    backendInput.style.cssText = `
+      width:100%;padding:10px 12px;border-radius:12px;border:1px solid ${C.faint}60;
+      background:rgba(255,255,255,0.6);color:${C.text};font-size:11px;
+      font-family:monospace;margin-bottom:8px;
+    `;
+    backendSection.appendChild(backendInput);
+
+    var backendSaveBtn = document.createElement('button');
+    backendSaveBtn.textContent = '保存并测试';
+    backendSaveBtn.className = 'shizuku-btn-hover';
+    backendSaveBtn.style.cssText = `
+      width:100%;padding:10px;border-radius:12px;border:none;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      color:white;font-size:12px;cursor:pointer;
+    `;
+    backendSaveBtn.onclick = function() {
+      var newBackend = backendInput.value.trim().replace(/\/+$/, '');
+      if (!newBackend) {
+        alert('后端地址不能为空');
+        return;
+      }
+      STATE.backend = newBackend;
+      saveSettings();
+
+      // 测试连接
+      backendSaveBtn.textContent = '测试中...';
+      backendSaveBtn.disabled = true;
+      neteaseCall('/login/status', {}).then(function(r) {
+        alert('连接成功！code=' + r.code);
+        backendSaveBtn.textContent = '保存并测试';
+        backendSaveBtn.disabled = false;
+      }).catch(function(err) {
+        alert('连接失败：' + err.message);
+        backendSaveBtn.textContent = '保存并测试';
+        backendSaveBtn.disabled = false;
+      });
+    };
+    backendSection.appendChild(backendSaveBtn);
+
+    content.appendChild(backendSection);
 
     // 账号信息
     var accountSection = document.createElement('div');
