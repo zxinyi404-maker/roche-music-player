@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-11:15-v3.18.0-backend-config';
+  var BUILD_TIME = '2026-08-02-11:30-v3.19.0-island-height';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -39,6 +39,7 @@
     appRefs: {},
     searchResults: [],
     roche: null,
+    islandTopOffset: 50, // 灵动岛距离顶部的偏移量（px）
     // 登录状态
     qrPollTimer: null,
     currentView: 'profile', // 'profile' | 'search' | 'player' | 'playlist'
@@ -245,6 +246,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.userProfile = data.userProfile || null;
       STATE.volume = data.volume || 0.8;
       STATE.quality = data.quality || 'standard';
+      STATE.backend = data.backend || 'https://sullymeow.ccwu.cc';
+      STATE.islandTopOffset = data.islandTopOffset || 50;
     } catch (e) {}
   }
 
@@ -253,7 +256,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       cookie: STATE.cookie,
       userProfile: STATE.userProfile,
       volume: STATE.volume,
-      quality: STATE.quality
+      quality: STATE.quality,
+      backend: STATE.backend,
+      islandTopOffset: STATE.islandTopOffset
     }));
   }
 
@@ -1079,15 +1084,22 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
   }
 
-  function playSong(song) {
+  function playSong(song, autoJumpToPlayer) {
     console.log('[播放歌曲]', song.name, 'ID:', song.id);
     STATE.currentSong = song;
     STATE.lyric = [];
     STATE.activeLyricIdx = -1;
 
-    // 跳转到播放器页面
-    STATE.currentView = 'player';
-    createUI();
+    // 只在明确要求跳转时才跳转到播放器页面
+    if (autoJumpToPlayer !== false) {
+      STATE.currentView = 'player';
+      createUI();
+    }
+
+    // 更新灵动岛信息（如果存在）
+    if (GLOBAL_ISLAND) {
+      updateIslandInfo();
+    }
 
     // 获取歌词
     neteaseLyric(song.id).then(function(data) {
@@ -1097,6 +1109,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       // 重新渲染播放器以显示歌词
       if (STATE.currentView === 'player') {
         createUI();
+      }
+      // 更新灵动岛歌词
+      if (GLOBAL_ISLAND) {
+        updateIslandLyric();
       }
     }).catch(function(e) {
       console.error('[获取歌词失败]', e);
@@ -1135,6 +1151,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         // 重新渲染播放器以更新播放状态
         if (STATE.currentView === 'player') {
           createUI();
+        }
+        // 更新灵动岛播放按钮
+        if (GLOBAL_ISLAND) {
+          updateIslandPlayBtn();
         }
       }).catch(function(e) {
         console.error('[播放失败]', e);
@@ -3202,6 +3222,72 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     content.appendChild(backendSection);
 
+    // 灵动岛高度设置
+    var islandSection = document.createElement('div');
+    islandSection.className = 'shizuku-glass';
+    islandSection.style.cssText = 'padding:16px;border-radius:20px;margin-bottom:16px';
+
+    var islandTitle = document.createElement('div');
+    islandTitle.textContent = '灵动岛高度';
+    islandTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:8px`;
+    islandSection.appendChild(islandTitle);
+
+    var islandDesc = document.createElement('div');
+    islandDesc.textContent = '调整灵动岛距离顶部的距离（不含安全区域）';
+    islandDesc.style.cssText = `font-size:10px;color:${C.muted};margin-bottom:12px;line-height:1.4`;
+    islandSection.appendChild(islandDesc);
+
+    var islandInputBox = document.createElement('div');
+    islandInputBox.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px';
+
+    var islandInput = document.createElement('input');
+    islandInput.type = 'number';
+    islandInput.value = STATE.islandTopOffset;
+    islandInput.min = '0';
+    islandInput.max = '200';
+    islandInput.step = '5';
+    islandInput.style.cssText = `
+      flex:1;padding:10px 12px;border-radius:12px;border:1px solid ${C.faint}60;
+      background:rgba(255,255,255,0.6);color:${C.text};font-size:13px;
+    `;
+
+    var islandUnit = document.createElement('div');
+    islandUnit.textContent = 'px';
+    islandUnit.style.cssText = `font-size:12px;color:${C.muted}`;
+
+    islandInputBox.appendChild(islandInput);
+    islandInputBox.appendChild(islandUnit);
+    islandSection.appendChild(islandInputBox);
+
+    var islandSaveBtn = document.createElement('button');
+    islandSaveBtn.textContent = '保存并预览';
+    islandSaveBtn.className = 'shizuku-btn-hover';
+    islandSaveBtn.style.cssText = `
+      width:100%;padding:10px;border-radius:12px;border:none;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      color:white;font-size:12px;cursor:pointer;
+    `;
+    islandSaveBtn.onclick = function() {
+      var newOffset = parseInt(islandInput.value) || 50;
+      if (newOffset < 0 || newOffset > 200) {
+        alert('请输入 0-200 之间的数值');
+        return;
+      }
+      STATE.islandTopOffset = newOffset;
+      saveSettings();
+
+      // 如果灵动岛存在，立即更新位置
+      if (GLOBAL_ISLAND) {
+        GLOBAL_ISLAND.style.top = `calc(env(safe-area-inset-top, 0px) + ${STATE.islandTopOffset}px)`;
+        alert('灵动岛高度已更新！');
+      } else {
+        alert('设置已保存！下次播放时生效');
+      }
+    };
+    islandSection.appendChild(islandSaveBtn);
+
+    content.appendChild(islandSection);
+
     // 账号信息
     var accountSection = document.createElement('div');
     accountSection.className = 'shizuku-glass';
@@ -3466,7 +3552,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     GLOBAL_ISLAND.id = 'roche-music-island';
     GLOBAL_ISLAND.style.cssText = `
       position:fixed;
-      top:calc(env(safe-area-inset-top, 0px) + 50px);
+      top:calc(env(safe-area-inset-top, 0px) + ${STATE.islandTopOffset}px);
       left:50%;transform:translateX(-50%);
       z-index:999999;
       background:rgba(20,20,25,0.95);
