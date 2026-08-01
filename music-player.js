@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:40-v3.9.1-like-feature';
+  var BUILD_TIME = '2026-08-02-02:50-v3.10.0-playback-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -418,9 +418,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           id: s.id,
           name: s.name,
           artist: (s.artists || s.ar || []).map(function(a) { return a.name; }).join(' / '),
+          artists: (s.artists || s.ar || []).map(function(a) { return a.name; }).join(' / '),
           album: (s.album || s.al || {}).name || '',
           pic: toHttps((s.album || s.al || {}).picUrl || ''),
-          duration: (s.duration || s.dt || 0) / 1000
+          albumPic: toHttps((s.album || s.al || {}).picUrl || ''),
+          duration: (s.duration || s.dt || 0) / 1000,
+          fee: s.fee || 0
         };
       });
       if (songs.length === 0) {
@@ -447,9 +450,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           id: s.id,
           name: s.name,
           artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+          artists: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
           album: (s.al || {}).name || '',
           pic: toHttps((s.al || {}).picUrl || ''),
-          duration: (s.dt || 0) / 1000
+          albumPic: toHttps((s.al || {}).picUrl || ''),
+          duration: (s.dt || 0) / 1000,
+          fee: s.fee || 0
         };
       });
       if (songs.length === 0) {
@@ -503,9 +509,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           id: t.id,
           name: t.name,
           artist: (t.ar || []).map(function(a) { return a.name; }).join(' / '),
+          artists: (t.ar || []).map(function(a) { return a.name; }).join(' / '),
           album: (t.al || {}).name || '',
           pic: toHttps((t.al || {}).picUrl || ''),
-          duration: (t.dt || 0) / 1000
+          albumPic: toHttps((t.al || {}).picUrl || ''),
+          duration: (t.dt || 0) / 1000,
+          fee: t.fee || 0
         };
       });
       STATE.currentPlaylistSongs = tracks;
@@ -2091,9 +2100,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           id: s.id,
           name: s.name,
           artist: (s.ar || s.artists || []).map(function(a) { return a.name; }).join(' / '),
+          artists: (s.ar || s.artists || []).map(function(a) { return a.name; }).join(' / '),
           album: (s.al || s.album || {}).name || '',
           pic: toHttps((s.al || s.album || {}).picUrl || ''),
-          duration: (s.dt || s.duration || 0) / 1000
+          albumPic: toHttps((s.al || s.album || {}).picUrl || ''),
+          duration: (s.dt || s.duration || 0) / 1000,
+          fee: s.fee || 0
         };
       });
       createUI();
@@ -2872,7 +2884,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.9.1',
+      version: '3.10.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
