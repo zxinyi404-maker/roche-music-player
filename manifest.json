@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.14.0",
-  "description": "✅ 使用正确的 API（/user/record 代替 /record/recent/song）",
+  "version": "3.14.1",
+  "description": "🔧 修复时序问题：等待数据加载完成后再刷新 UI",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

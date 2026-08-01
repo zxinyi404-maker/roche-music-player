@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-06:00-v3.14.0-use-correct-api';
+  var BUILD_TIME = '2026-08-02-06:15-v3.14.1-fix-timing';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -298,8 +298,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         saveSettings();
         // 登录成功后自动加载所有数据（照抄 SullyOS）
         console.log('[开始加载用户数据]');
-        loadAllUserData();
-        return data.data.profile;
+        return loadAllUserData(); // 返回 Promise，等待数据加载完成
       }
       return null;
     }).catch(function(e) {
@@ -310,10 +309,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // 加载所有用户数据（照抄 SullyOS 的 Promise.allSettled）
   function loadAllUserData() {
-    if (!STATE.userProfile) return;
+    if (!STATE.userProfile) return Promise.resolve();
     console.log('[loadAllUserData] 开始加载用户所有数据');
 
-    Promise.allSettled([
+    return Promise.allSettled([
       neteaseUserPlaylist(STATE.userProfile.userId),
       neteaseUserRecord(STATE.userProfile.userId, 1),
       neteaseCall('/user/cloud', { limit: 200 }),
