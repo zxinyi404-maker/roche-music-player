@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-11:45-v3.20.0-roche-storage';
+  var BUILD_TIME = '2026-08-02-12:00-v3.20.1-fix-island-sync';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
