@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:20-v3.8.0-play-function-fix';
+  var BUILD_TIME = '2026-08-02-02:30-v3.9.0-full-features';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -48,8 +48,12 @@
     // 用户数据
     userPlaylists: [],
     currentPlaylistSongs: [],
+    playRecord: [], // 播放记录
+    cloudSongs: [], // 云盘歌曲
+    likedSongs: [], // 喜欢的歌曲
     expandedPlaylistId: null,
     signedIn: false,
+    currentTab: 'playlist', // 'playlist' | 'record' | 'cloud'
     // 登录面板状态（持久化）
     loginState: {
       mode: 'qr',
@@ -1352,8 +1356,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     settingsBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
     settingsBtn.appendChild(svg('settings', 16, C.primary));
     settingsBtn.onclick = function() {
-      // 设置功能待实现
-      alert('设置功能开发中...');
+      STATE.currentView = 'settings';
+      createUI();
     };
     rightBtns.appendChild(settingsBtn);
 
@@ -1598,15 +1602,106 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
       content.appendChild(playlistSection);
     } else if (STATE.currentTab === 'record') {
-      var recordHint = document.createElement('div');
-      recordHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
-      recordHint.textContent = '播放记录功能开发中...';
-      content.appendChild(recordHint);
+      // 播放记录
+      var recordSection = document.createElement('div');
+      recordSection.style.cssText = 'margin:0 16px;position:relative;z-index:10';
+
+      // 加载播放记录
+      if (!STATE.playRecord || STATE.playRecord.length === 0) {
+        var loadingHint = document.createElement('div');
+        loadingHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+        loadingHint.textContent = '加载中...';
+        recordSection.appendChild(loadingHint);
+
+        // 调用 API 加载
+        neteaseRecordRecentSong(STATE.userProfile.userId).then(function(data) {
+          var records = (data.data && data.data.list) || [];
+          STATE.playRecord = records.map(function(r) {
+            var s = r.data || r.song || {};
+            return {
+              id: s.id,
+              name: s.name,
+              artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+              artists: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+              album: (s.al || {}).name || '',
+              pic: toHttps((s.al || {}).picUrl || ''),
+              albumPic: toHttps((s.al || {}).picUrl || ''),
+              duration: (s.dt || 0) / 1000,
+              fee: s.fee || 0
+            };
+          });
+          createUI(); // 重新渲染
+        }).catch(function(e) {
+          console.error('[加载播放记录失败]', e);
+        });
+      } else {
+        // 显示播放记录
+        STATE.playRecord.forEach(function(song, idx) {
+          var row = createSongRow(song, idx);
+          row.onclick = function() {
+            STATE.playlist = STATE.playRecord;
+            STATE.currentIndex = idx;
+            playSong(song);
+          };
+          recordSection.appendChild(row);
+        });
+      }
+
+      content.appendChild(recordSection);
     } else if (STATE.currentTab === 'cloud') {
-      var cloudHint = document.createElement('div');
-      cloudHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
-      cloudHint.textContent = '云盘功能开发中...';
-      content.appendChild(cloudHint);
+      // 云盘
+      var cloudSection = document.createElement('div');
+      cloudSection.style.cssText = 'margin:0 16px;position:relative;z-index:10';
+
+      // 加载云盘
+      if (!STATE.cloudSongs || STATE.cloudSongs.length === 0) {
+        var loadingHint = document.createElement('div');
+        loadingHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+        loadingHint.textContent = '加载中...';
+        cloudSection.appendChild(loadingHint);
+
+        // 调用 API 加载云盘
+        neteaseCall('/user/cloud', { limit: 200 }).then(function(data) {
+          var cloudData = data.data || [];
+          STATE.cloudSongs = cloudData.map(function(item) {
+            var s = item.simpleSong || {};
+            return {
+              id: s.id,
+              name: s.name,
+              artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+              artists: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
+              album: (s.al || {}).name || '',
+              pic: toHttps((s.al || {}).picUrl || ''),
+              albumPic: toHttps((s.al || {}).picUrl || ''),
+              duration: (s.dt || 0) / 1000,
+              fee: 0
+            };
+          });
+          createUI(); // 重新渲染
+        }).catch(function(e) {
+          console.error('[加载云盘失败]', e);
+        });
+      } else {
+        if (STATE.cloudSongs.length === 0) {
+          var emptyHint = document.createElement('div');
+          emptyHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+          emptyHint.textContent = '云盘为空';
+          cloudSection.appendChild(emptyHint);
+        } else {
+          // 显示云盘歌曲
+          STATE.cloudSongs.forEach(function(song, idx) {
+            var row = createSongRow(song, idx);
+            row.onclick = function() {
+              STATE.playlist = STATE.cloudSongs;
+              STATE.currentIndex = idx;
+              playSong(song);
+            };
+            cloudSection.appendChild(row);
+          });
+        }
+      }
+
+      content.appendChild(cloudSection);
     }
 
     container.appendChild(content);
@@ -2522,6 +2617,162 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     STATE.appContainer.appendChild(container);
   }
 
+  // 设置页面
+  function createSettingsView() {
+    var container = document.createElement('div');
+    container.style.cssText = `
+      position:absolute;inset:0;
+      background:linear-gradient(180deg, #ffffff 0%, ${C.bg} 50%, ${C.bgDeep} 100%);
+      display:flex;flex-direction:column;
+    `;
+
+    // 背景装饰
+    container.appendChild(createBokehBg());
+
+    // Header
+    var header = document.createElement('div');
+    header.className = 'shizuku-glass-strong ios-safe-top';
+    header.style.cssText = `
+      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
+      border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
+    `;
+
+    // 返回按钮
+    var backBtn = document.createElement('button');
+    backBtn.className = 'shizuku-btn-hover';
+    backBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    backBtn.appendChild(svg('chevron-left', 16, C.primary));
+    backBtn.onclick = function() {
+      STATE.currentView = 'profile';
+      createUI();
+    };
+    header.appendChild(backBtn);
+
+    // 标题
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
+    var title = document.createElement('div');
+    title.textContent = '设置';
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    titleBox.appendChild(title);
+    header.appendChild(titleBox);
+
+    // 占位
+    var placeholder = document.createElement('div');
+    placeholder.style.cssText = 'width:32px;height:32px';
+    header.appendChild(placeholder);
+
+    container.appendChild(header);
+
+    // 内容区
+    var content = document.createElement('div');
+    content.className = 'shizuku-scrollbar ios-safe-bottom';
+    content.style.cssText = 'flex:1;overflow-y:auto;padding:20px 16px;position:relative;z-index:10';
+
+    // 音质设置
+    var qualitySection = document.createElement('div');
+    qualitySection.className = 'shizuku-glass';
+    qualitySection.style.cssText = 'padding:16px;border-radius:20px;margin-bottom:16px';
+
+    var qualityTitle = document.createElement('div');
+    qualityTitle.textContent = '音质选择';
+    qualityTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:12px`;
+    qualitySection.appendChild(qualityTitle);
+
+    var qualities = [
+      { value: 'standard', label: '标准' },
+      { value: 'higher', label: '较高' },
+      { value: 'exhigh', label: '极高' },
+      { value: 'lossless', label: '无损' },
+      { value: 'hires', label: 'Hi-Res' }
+    ];
+
+    qualities.forEach(function(q) {
+      var qBtn = document.createElement('button');
+      qBtn.textContent = q.label;
+      qBtn.className = 'shizuku-btn-hover';
+      qBtn.style.cssText = `
+        display:block;width:100%;padding:10px;margin-bottom:8px;border-radius:12px;border:none;cursor:pointer;
+        font-size:12px;text-align:left;transition:all 0.2s;
+        background:${STATE.quality === q.value ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'rgba(255,255,255,0.4)'};
+        color:${STATE.quality === q.value ? 'white' : C.text};
+      `;
+      qBtn.onclick = function() {
+        STATE.quality = q.value;
+        saveSettings();
+        createUI();
+      };
+      qualitySection.appendChild(qBtn);
+    });
+
+    content.appendChild(qualitySection);
+
+    // 账号信息
+    var accountSection = document.createElement('div');
+    accountSection.className = 'shizuku-glass';
+    accountSection.style.cssText = 'padding:16px;border-radius:20px;margin-bottom:16px';
+
+    var accountTitle = document.createElement('div');
+    accountTitle.textContent = '账号';
+    accountTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:12px`;
+    accountSection.appendChild(accountTitle);
+
+    var userInfo = document.createElement('div');
+    userInfo.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:12px';
+
+    var avatar = document.createElement('img');
+    avatar.src = STATE.userProfile.avatarUrl;
+    avatar.style.cssText = 'width:48px;height:48px;border-radius:50%;object-fit:cover';
+    userInfo.appendChild(avatar);
+
+    var userText = document.createElement('div');
+    userText.innerHTML = `
+      <div style="font-size:14px;color:${C.text};font-weight:500">${STATE.userProfile.nickname}</div>
+      <div style="font-size:11px;color:${C.muted};margin-top:4px">UID: ${STATE.userProfile.userId}</div>
+    `;
+    userInfo.appendChild(userText);
+
+    accountSection.appendChild(userInfo);
+
+    var logoutBtn = document.createElement('button');
+    logoutBtn.textContent = '退出登录';
+    logoutBtn.className = 'shizuku-btn-hover';
+    logoutBtn.style.cssText = `
+      width:100%;padding:10px;border-radius:12px;border:1px solid ${C.faint}40;
+      background:rgba(255,255,255,0.4);color:${C.muted};font-size:12px;cursor:pointer;
+    `;
+    logoutBtn.onclick = logout;
+    accountSection.appendChild(logoutBtn);
+
+    content.appendChild(accountSection);
+
+    // 关于
+    var aboutSection = document.createElement('div');
+    aboutSection.className = 'shizuku-glass';
+    aboutSection.style.cssText = 'padding:16px;border-radius:20px';
+
+    var aboutTitle = document.createElement('div');
+    aboutTitle.textContent = '关于';
+    aboutTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:8px`;
+    aboutSection.appendChild(aboutTitle);
+
+    var aboutText = document.createElement('div');
+    aboutText.innerHTML = `
+      <div style="font-size:11px;color:${C.muted};line-height:1.6">
+        网易云音乐播放器 Shizuku 主题<br>
+        版本：v3.8.0<br>
+        完全照抄 SullyOS 美化设计
+      </div>
+    `;
+    aboutSection.appendChild(aboutText);
+
+    content.appendChild(aboutSection);
+
+    container.appendChild(content);
+    STATE.appContainer.innerHTML = '';
+    STATE.appContainer.appendChild(container);
+  }
+
   // ==================== UI 构建 ====================
   function createUI() {
     injectStyles();
@@ -2553,6 +2804,11 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       return;
     }
 
+    if (STATE.currentView === 'settings') {
+      createSettingsView(); // 设置页面
+      return;
+    }
+
     // 默认显示用户主页
     createProfileView();
   }
@@ -2572,7 +2828,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.8.0',
+      version: '3.9.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
