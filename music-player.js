@@ -277,6 +277,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   function loginCellphone(phone, captcha) { return neteaseCall('/login/cellphone', { phone, captcha }); }
   function neteaseSearch(keyword) { return neteaseCall('/search', { keyword, limit: 30, type: 1 }); }
   function neteaseSongUrl(id) { return neteaseCall('/song/url', { ids: [id], level: STATE.quality }); }
+  function neteaseLyric(id) { return neteaseCall('/lyric', { id }); }
   function neteaseUserPlaylist(uid) { return neteaseCall('/user/playlist', { uid, limit: 100 }); }
   function neteasePlaylistDetail(id) { return neteaseCall('/playlist/detail', { id }); }
   function neteaseRecommendSongs() { return neteaseCall('/recommend/songs', {}); }
