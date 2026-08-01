@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-23:30-v3.5.0-shizuku-enhanced';
+  var BUILD_TIME = '2026-08-01-23:45-v3.5.1-ios-safe-area-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -594,7 +594,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     // 内容区域
     var content = document.createElement('div');
-    content.className = 'shizuku-scrollbar';
+    content.className = 'shizuku-scrollbar ios-safe-bottom';
     content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
 
     if (loginState.mode === 'qr') {
@@ -1647,7 +1647,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     // 结果列表
     var resultsList = document.createElement('div');
-    resultsList.className = 'shizuku-scrollbar';
+    resultsList.className = 'shizuku-scrollbar ios-safe-bottom';
     resultsList.style.cssText = 'flex:1;overflow-y:auto;padding:0 8px;padding-bottom:100px;position:relative;z-index:10';
 
     if (STATE.searchResults.length === 0) {
@@ -1965,6 +1965,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     // 主内容区
     var content = document.createElement('div');
+    content.className = 'ios-safe-bottom';
     content.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;padding:20px;overflow:hidden;position:relative;z-index:10';
 
     // 唱片封面（带旋转动画）- 更精致的设计
@@ -2403,7 +2404,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.5.0',
+      version: '3.5.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
