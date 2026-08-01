@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-01:15-v3.6.3-profile-back-btn';
+  var BUILD_TIME = '2026-08-02-01:30-v3.7.0-profile-complete-redesign';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1441,55 +1441,148 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     stats.appendChild(createStatCell('粉丝', STATE.userProfile.followeds || 0));
     userCard.appendChild(stats);
 
-    // 快捷按钮行
+    // 快捷按钮行 - 照抄 SullyOS（三个横排按钮）
     var quickBtns = document.createElement('div');
-    quickBtns.style.cssText = 'display:flex;gap:8px;margin-top:12px';
+    quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px';
 
     var signBtn = document.createElement('button');
     signBtn.textContent = STATE.signedIn ? '已签到 ✓' : '每日签到';
     signBtn.className = 'shizuku-glass shizuku-btn-hover';
-    signBtn.style.cssText = `flex:1;padding:8px;border-radius:12px;border:1px solid ${STATE.signedIn ? C.faint : C.primary}30;font-size:11px;color:${STATE.signedIn ? C.muted : C.primary};cursor:pointer;transition:all 0.2s`;
+    signBtn.style.cssText = `padding:8px;border-radius:12px;border:1px solid ${STATE.signedIn ? C.faint : C.primary}30;font-size:11px;color:${STATE.signedIn ? C.muted : C.primary};cursor:pointer;transition:all 0.2s;text-align:center`;
     signBtn.onclick = function() {
       if (!STATE.signedIn) doSignIn();
     };
     quickBtns.appendChild(signBtn);
 
-    var logoutBtn = document.createElement('button');
-    logoutBtn.textContent = '退出登录';
-    logoutBtn.className = 'shizuku-glass shizuku-btn-hover';
-    logoutBtn.style.cssText = `flex:1;padding:8px;border-radius:12px;border:1px solid ${C.faint}30;font-size:11px;color:${C.muted};cursor:pointer;transition:all 0.2s`;
-    logoutBtn.onclick = logout;
-    quickBtns.appendChild(logoutBtn);
+    var dailyBtn = document.createElement('button');
+    dailyBtn.textContent = '每日推荐';
+    dailyBtn.style.cssText = `
+      padding:8px;border-radius:12px;border:none;font-size:11px;color:white;cursor:pointer;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      box-shadow:0 3px 15px ${C.primary}30;transition:all 0.2s;text-align:center;
+    `;
+    dailyBtn.onclick = loadDailyRecommend;
+    quickBtns.appendChild(dailyBtn);
+
+    var fmBtn = document.createElement('button');
+    fmBtn.textContent = '私人 FM';
+    fmBtn.className = 'shizuku-glass shizuku-btn-hover';
+    fmBtn.style.cssText = `padding:8px;border-radius:12px;border:1px solid ${C.faint}30;font-size:11px;color:${C.primary};cursor:pointer;transition:all 0.2s;text-align:center`;
+    fmBtn.onclick = loadPersonalFm;
+    quickBtns.appendChild(fmBtn);
 
     userCard.appendChild(quickBtns);
+
+    // 退出登录按钮 - 单独一行
+    var logoutBtn = document.createElement('button');
+    logoutBtn.textContent = '退出登录';
+    logoutBtn.style.cssText = `
+      width:100%;margin-top:12px;padding:6px;border:none;background:transparent;
+      font-size:10px;color:${C.muted};cursor:pointer;transition:all 0.2s;text-align:center;
+    `;
+    logoutBtn.onclick = logout;
+    userCard.appendChild(logoutBtn);
+
     content.appendChild(userCard);
 
-    // 功能卡片网格
-    var funcGrid = document.createElement('div');
-    funcGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px;';
+    // Tab 切换 - 照抄 SullyOS
+    var tabBar = document.createElement('div');
+    tabBar.className = 'shizuku-glass';
+    tabBar.style.cssText = 'margin:20px 16px 12px;display:flex;align-items:center;gap:4px;border-radius:20px;padding:4px';
 
-    function createFuncCard(emoji, title, subtitle, onclick) {
-      var card = document.createElement('button');
-      card.className = 'shizuku-glass shizuku-btn-hover';
-      card.style.cssText = `padding:16px;border-radius:16px;border:none;cursor:pointer;text-align:left;transition:all 0.2s`;
-      card.onclick = onclick;
-      card.innerHTML = `
-        <div style="font-size:24px;margin-bottom:8px">${emoji}</div>
-        <div style="font-size:13px;color:${C.text};font-weight:500">${title}</div>
-        <div style="font-size:10px;color:${C.muted};margin-top:4px">${subtitle}</div>
+    var tabs = [
+      { key: 'playlist', label: '歌单' },
+      { key: 'record', label: '最近' },
+      { key: 'cloud', label: '云盘' }
+    ];
+
+    STATE.currentTab = STATE.currentTab || 'playlist';
+
+    tabs.forEach(function(tab) {
+      var tabBtn = document.createElement('button');
+      tabBtn.textContent = tab.label;
+      tabBtn.className = STATE.currentTab === tab.key ? '' : 'shizuku-btn-hover';
+      tabBtn.style.cssText = `
+        flex:1;padding:6px;border-radius:16px;border:none;
+        font-size:11px;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;
+        background:${STATE.currentTab === tab.key ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'transparent'};
+        color:${STATE.currentTab === tab.key ? 'white' : C.muted};
       `;
-      return card;
+      tabBtn.onclick = function() {
+        STATE.currentTab = tab.key;
+        createUI();
+      };
+      tabBar.appendChild(tabBtn);
+    });
+
+    content.appendChild(tabBar);
+
+    // 歌单列表 - 照抄 SullyOS
+    if (STATE.currentTab === 'playlist') {
+      var playlistSection = document.createElement('div');
+      playlistSection.style.cssText = 'margin:0 16px;position:relative;z-index:10';
+
+      if (STATE.userPlaylists.length === 0) {
+        var emptyHint = document.createElement('div');
+        emptyHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+        emptyHint.textContent = '还没有歌单';
+        playlistSection.appendChild(emptyHint);
+      } else {
+        STATE.userPlaylists.forEach(function(playlist) {
+          var plCard = document.createElement('div');
+          plCard.className = 'shizuku-glass';
+          plCard.style.cssText = 'padding:12px;border-radius:16px;margin-bottom:8px;cursor:pointer;transition:all 0.2s';
+          plCard.onclick = function() {
+            STATE.expandedPlaylistId = playlist.id;
+            STATE.currentView = 'playlist';
+            createUI();
+          };
+
+          var plTop = document.createElement('div');
+          plTop.style.cssText = 'display:flex;align-items:center;gap:12px';
+
+          var plCover = document.createElement('img');
+          plCover.src = playlist.coverImgUrl || 'https://p1.music.126.net/y19E5SadGUmSR8SZxkrNtw==/109951163965029180.jpg';
+          plCover.style.cssText = 'width:48px;height:48px;border-radius:12px;object-fit:cover;flex-shrink:0';
+          plTop.appendChild(plCover);
+
+          var plInfo = document.createElement('div');
+          plInfo.style.cssText = 'flex:1;min-width:0';
+
+          var plName = document.createElement('div');
+          plName.textContent = playlist.name;
+          plName.style.cssText = `font-size:13px;color:${C.text};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+          plInfo.appendChild(plName);
+
+          var plMeta = document.createElement('div');
+          plMeta.textContent = playlist.trackCount + ' 首' + (playlist.creator ? ' · ' + playlist.creator : '');
+          plMeta.style.cssText = `font-size:10px;color:${C.muted};margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+          plInfo.appendChild(plMeta);
+
+          plTop.appendChild(plInfo);
+
+          var expandIcon = document.createElement('div');
+          expandIcon.textContent = '→';
+          expandIcon.style.cssText = `font-size:14px;color:${C.muted}`;
+          plTop.appendChild(expandIcon);
+
+          plCard.appendChild(plTop);
+          playlistSection.appendChild(plCard);
+        });
+      }
+
+      content.appendChild(playlistSection);
+    } else if (STATE.currentTab === 'record') {
+      var recordHint = document.createElement('div');
+      recordHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+      recordHint.textContent = '播放记录功能开发中...';
+      content.appendChild(recordHint);
+    } else if (STATE.currentTab === 'cloud') {
+      var cloudHint = document.createElement('div');
+      cloudHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
+      cloudHint.textContent = '云盘功能开发中...';
+      content.appendChild(cloudHint);
     }
-
-    funcGrid.appendChild(createFuncCard('🎵', '每日推荐', '为你精选30首', loadDailyRecommend));
-    funcGrid.appendChild(createFuncCard('📻', '私人FM', '不重样的惊喜', loadPersonalFm));
-    funcGrid.appendChild(createFuncCard('💿', '我的歌单', STATE.userPlaylists.length + ' 个歌单', function() {
-      STATE.currentView = 'playlist';
-      createUI();
-    }));
-    funcGrid.appendChild(createFuncCard('🕐', '播放记录', '最近听过的歌', loadPlayRecord));
-
-    content.appendChild(funcGrid);
 
     container.appendChild(content);
     STATE.appContainer.innerHTML = '';
@@ -2440,7 +2533,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.6.3',
+      version: '3.7.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
