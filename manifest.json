@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.11.0",
-  "description": "🎵 播放器增强：喜欢按钮+播放模式+音量控制",
+  "version": "3.11.1",
+  "description": "✅ 完整功能：所有功能已实现并验证",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
