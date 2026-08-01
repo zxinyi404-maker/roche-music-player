@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-10:30-v3.17.5-fix-captcha-v2';
+  var BUILD_TIME = '2026-08-02-11:00-v3.17.6-fix-api-check';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -266,7 +266,14 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         'X-Netease-Cookie': STATE.cookie || ''
       },
       body: JSON.stringify(body || {})
-    }).then(r => r.json());
+    }).then(function(res) {
+      return res.json().then(function(j) {
+        if (!res.ok) {
+          throw new Error(j.error || j.message || 'HTTP ' + res.status);
+        }
+        return j;
+      });
+    });
   }
 
   function loginQrKey() { return neteaseCall('/login/qr/key', {}); }
