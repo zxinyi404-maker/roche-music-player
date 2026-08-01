@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-04:00-v3.12.0-debug';
+  var BUILD_TIME = '2026-08-02-04:10-v3.12.1-lyric-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -295,9 +295,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       if (data && data.data && data.data.profile) {
         STATE.userProfile = data.data.profile;
         saveSettings();
-        // 登录成功后自动加载歌单和喜欢列表
-        loadUserPlaylists();
-        loadLikedSongs();
+        // 登录成功后自动加载所有数据（照抄 SullyOS）
+        console.log('[开始加载用户数据]');
+        loadAllUserData();
         return data.data.profile;
       }
       return null;
@@ -307,15 +307,96 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
   }
 
-  // 加载喜欢列表
-  function loadLikedSongs() {
-    if (!STATE.cookie) return;
-    neteaseCall('/likelist', {}).then(function(data) {
-      var ids = (data.ids || data.data && data.data.ids) || [];
-      STATE.likedSongs = ids;
-      console.log('[喜欢列表]', ids.length + ' 首');
-    }).catch(function(e) {
-      console.error('[获取喜欢列表失败]', e);
+  // 加载所有用户数据（照抄 SullyOS 的 Promise.allSettled）
+  function loadAllUserData() {
+    if (!STATE.userProfile) return;
+    console.log('[loadAllUserData] 开始加载用户所有数据');
+
+    Promise.allSettled([
+      neteaseUserPlaylist(STATE.userProfile.userId),
+      neteaseRecordRecentSong(STATE.userProfile.userId),
+      neteaseUserCloud(),
+      neteaseCall('/likelist', {})
+    ]).then(function(results) {
+      console.log('[Promise.allSettled 完成]', results);
+
+      // 歌单
+      if (results[0].status === 'fulfilled') {
+        var plData = results[0].value;
+        STATE.userPlaylists = (plData.playlist || []).map(function(p) {
+          return {
+            id: p.id,
+            name: p.name,
+            coverImgUrl: toHttps(p.coverImgUrl || ''),
+            trackCount: p.trackCount || 0,
+            creator: p.creator ? p.creator.nickname : ''
+          };
+        });
+        console.log('[歌单加载完成]', STATE.userPlaylists.length + ' 个');
+      } else {
+        console.error('[歌单加载失败]', results[0].reason);
+      }
+
+      // 播放记录（照抄 SullyOS：weekData）
+      if (results[1].status === 'fulfilled') {
+        var recData = results[1].value;
+        var weekly = recData.weekData || recData.allData || [];
+        STATE.playRecord = weekly.map(function(r) {
+          return {
+            id: r.song.id,
+            name: r.song.name,
+            artist: (r.song.ar || []).map(function(a) { return a.name; }).join(' / '),
+            artists: (r.song.ar || []).map(function(a) { return a.name; }).join(' / '),
+            album: (r.song.al || {}).name || '',
+            pic: toHttps((r.song.al || {}).picUrl || ''),
+            albumPic: toHttps((r.song.al || {}).picUrl || ''),
+            duration: (r.song.dt || 0) / 1000,
+            fee: r.song.fee || 0,
+            playCount: r.playCount || 0,
+            score: r.score || 0
+          };
+        });
+        console.log('[播放记录加载完成]', STATE.playRecord.length + ' 首');
+      } else {
+        console.error('[播放记录加载失败]', results[1].reason);
+      }
+
+      // 云盘（照抄 SullyOS：simpleSong）
+      if (results[2].status === 'fulfilled') {
+        var cloudData = results[2].value;
+        var clData = cloudData.data || [];
+        STATE.cloudSongs = clData.map(function(c) {
+          return {
+            id: c.songId || (c.simpleSong && c.simpleSong.id),
+            name: c.songName || (c.simpleSong && c.simpleSong.name) || '',
+            artist: c.artist || (c.simpleSong && c.simpleSong.ar || []).map(function(a) { return a.name; }).join(' / '),
+            artists: c.artist || (c.simpleSong && c.simpleSong.ar || []).map(function(a) { return a.name; }).join(' / '),
+            album: c.album || (c.simpleSong && c.simpleSong.al && c.simpleSong.al.name) || '',
+            pic: toHttps((c.simpleSong && c.simpleSong.al && c.simpleSong.al.picUrl) || ''),
+            albumPic: toHttps((c.simpleSong && c.simpleSong.al && c.simpleSong.al.picUrl) || ''),
+            duration: (c.simpleSong && c.simpleSong.dt || 0) / 1000,
+            fee: 0
+          };
+        });
+        console.log('[云盘加载完成]', STATE.cloudSongs.length + ' 首');
+      } else {
+        console.error('[云盘加载失败]', results[2].reason);
+      }
+
+      // 喜欢列表
+      if (results[3].status === 'fulfilled') {
+        var likeData = results[3].value;
+        STATE.likedSongs = likeData.ids || likeData.data && likeData.data.ids || [];
+        console.log('[喜欢列表加载完成]', STATE.likedSongs.length + ' 首');
+      } else {
+        console.error('[喜欢列表加载失败]', results[3].reason);
+      }
+
+      // 刷新界面
+      if (STATE.currentView === 'profile') {
+        console.log('[刷新界面显示数据]');
+        createUI();
+      }
     });
   }
 
@@ -350,38 +431,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
   }
 
-  // 加载播放记录
-  function loadPlayRecord() {
-    if (!STATE.userProfile) {
-      alert('请先登录');
-      return;
-    }
-    console.log('[加载播放记录]');
-    neteaseRecordRecentSong(STATE.userProfile.userId).then(function(data) {
-      var records = (data.data && data.data.list) || [];
-      var songs = records.map(function(r) {
-        var s = r.data || r.song || {};
-        return {
-          id: s.id,
-          name: s.name,
-          artist: (s.ar || []).map(function(a) { return a.name; }).join(' / '),
-          album: (s.al || {}).name || '',
-          pic: toHttps((s.al || {}).picUrl || ''),
-          duration: (s.dt || 0) / 1000
-        };
-      });
-      if (songs.length === 0) {
-        alert('暂无播放记录');
-        return;
-      }
-      STATE.searchResults = songs;
-      STATE.currentView = 'search';
-      createUI();
-    }).catch(function(e) {
-      console.error('[加载播放记录失败]', e);
-      alert('加载失败：' + e.message);
-    });
-  }
+  // 旧的单独加载函数已废弃，现在使用 loadAllUserData 统一加载
 
   // 签到功能
   function doSignIn() {
@@ -2956,7 +3006,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.12.0',
+      version: '3.12.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
