@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-01:10-v3.6.2-final-polish';
+  var BUILD_TIME = '2026-08-02-01:15-v3.6.3-profile-back-btn';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1293,10 +1293,18 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
-    // 左侧占位（保持三栏布局平衡）
-    var leftPlaceholder = document.createElement('div');
-    leftPlaceholder.style.cssText = 'width:32px';
-    header.appendChild(leftPlaceholder);
+    // 左侧返回按钮
+    var backBtn = document.createElement('button');
+    backBtn.className = 'shizuku-btn-hover';
+    backBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    backBtn.appendChild(svg('chevron-left', 16, C.primary));
+    backBtn.onclick = function() {
+      // 关闭应用或返回
+      if (STATE.roche && STATE.roche.ui && STATE.roche.ui.closeApp) {
+        STATE.roche.ui.closeApp();
+      }
+    };
+    header.appendChild(backBtn);
 
     // 中间标题
     var titleBox = document.createElement('div');
@@ -2432,7 +2440,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.6.2',
+      version: '3.6.3',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
