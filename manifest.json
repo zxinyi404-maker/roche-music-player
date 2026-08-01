@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.16.1",
-  "description": "🔧 修复播放器进度条和时长显示更新",
+  "version": "3.17.0",
+  "description": "✨ 全局灵动岛：退出插件后在 Roche 主界面显示悬浮播放器",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

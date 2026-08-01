@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-08:00-v3.16.1-fix-progress';
+  var BUILD_TIME = '2026-08-02-09:00-v3.17.0-dynamic-island';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -3300,9 +3300,245 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     console.log('[网易云音乐播放器 Shizuku] 初始化', BUILD_TIME);
     STATE.roche = roche;
     STATE.appContainer = container;
+
+    // 打开插件时移除全局灵动岛
+    removeGlobalIsland();
+
     loadSettings();
     initAudio();
     createUI();
+  }
+
+  // ==================== 全局灵动岛 MiniPlayer ====================
+  var GLOBAL_ISLAND = null;
+
+  function createGlobalIsland() {
+    // 如果已存在，先移除
+    if (GLOBAL_ISLAND) {
+      document.body.removeChild(GLOBAL_ISLAND);
+      GLOBAL_ISLAND = null;
+    }
+
+    if (!STATE.currentSong) return;
+
+    // 创建灵动岛容器
+    GLOBAL_ISLAND = document.createElement('div');
+    GLOBAL_ISLAND.id = 'roche-music-island';
+    GLOBAL_ISLAND.style.cssText = `
+      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      z-index:999999;
+      background:rgba(20,20,25,0.95);
+      backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+      border-radius:24px;padding:8px 16px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+      display:flex;align-items:center;gap:12px;
+      cursor:pointer;transition:all 0.3s;
+      max-width:420px;
+    `;
+
+    // 封面
+    var cover = document.createElement('img');
+    cover.src = STATE.currentSong.pic || STATE.currentSong.albumPic;
+    cover.style.cssText = `
+      width:36px;height:36px;border-radius:8px;object-fit:cover;
+      flex-shrink:0;
+    `;
+    GLOBAL_ISLAND.appendChild(cover);
+
+    // 信息区域（可展开显示歌词）
+    var infoBox = document.createElement('div');
+    infoBox.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px';
+
+    var songName = document.createElement('div');
+    songName.textContent = STATE.currentSong.name;
+    songName.style.cssText = `
+      font-size:12px;font-weight:500;color:white;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    `;
+    infoBox.appendChild(songName);
+
+    // 显示当前歌词
+    var lyricText = document.createElement('div');
+    lyricText.id = 'island-lyric';
+    lyricText.style.cssText = `
+      font-size:10px;color:rgba(255,255,255,0.6);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+      font-style:italic;
+    `;
+    updateIslandLyric(lyricText);
+    infoBox.appendChild(lyricText);
+
+    GLOBAL_ISLAND.appendChild(infoBox);
+
+    // 控制按钮
+    var controls = document.createElement('div');
+    controls.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0';
+
+    // 上一曲
+    var prevBtn = document.createElement('button');
+    prevBtn.style.cssText = `
+      width:28px;height:28px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.1);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
+    `;
+    prevBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 256 256" fill="white"><path d="M224,114,96,34A8,8,0,0,0,84,40V216a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14ZM40,40V216a8,8,0,0,1-16,0V40a8,8,0,0,1,16,0Z"/></svg>`;
+    prevBtn.onclick = function(e) {
+      e.stopPropagation();
+      playPrev();
+      updateIslandInfo();
+    };
+    controls.appendChild(prevBtn);
+
+    // 播放/暂停
+    var playBtn = document.createElement('button');
+    playBtn.id = 'island-play-btn';
+    playBtn.style.cssText = `
+      width:32px;height:32px;border-radius:50%;border:none;
+      background:white;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
+    `;
+    var playIcon = STATE.isPlaying ?
+      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>' :
+      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M232,114.5,88,26.5A8,8,0,0,0,76,33V223a8,8,0,0,0,12,6.5l144-88a8,8,0,0,0,0-13Z"/></svg>';
+    playBtn.innerHTML = playIcon;
+    playBtn.onclick = function(e) {
+      e.stopPropagation();
+      togglePlay();
+      setTimeout(updateIslandPlayBtn, 100);
+    };
+    controls.appendChild(playBtn);
+
+    // 下一曲
+    var nextBtn = document.createElement('button');
+    nextBtn.style.cssText = `
+      width:28px;height:28px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.1);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
+    `;
+    nextBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 256 256" fill="white"><path d="M200,32a8,8,0,0,0-8,8V216a8,8,0,0,0,16,0V40A8,8,0,0,0,200,32Zm-36,86-128-80A8,8,0,0,0,24,46v165a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14Z"/></svg>`;
+    nextBtn.onclick = function(e) {
+      e.stopPropagation();
+      playNext();
+      updateIslandInfo();
+    };
+    controls.appendChild(nextBtn);
+
+    // 关闭按钮
+    var closeBtn = document.createElement('button');
+    closeBtn.style.cssText = `
+      width:24px;height:24px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.1);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;margin-left:4px;
+    `;
+    closeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 256 256" fill="white"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>`;
+    closeBtn.onclick = function(e) {
+      e.stopPropagation();
+      if (STATE.audio) {
+        STATE.audio.pause();
+      }
+      removeGlobalIsland();
+    };
+    controls.appendChild(closeBtn);
+
+    GLOBAL_ISLAND.appendChild(controls);
+
+    // 点击灵动岛重新打开音乐插件
+    GLOBAL_ISLAND.onclick = function() {
+      if (STATE.roche && STATE.roche.ui && STATE.roche.ui.openApp) {
+        STATE.roche.ui.openApp('roche-music-player');
+      }
+    };
+
+    // Hover 效果
+    GLOBAL_ISLAND.onmouseenter = function() {
+      this.style.transform = 'translateX(-50%) scale(1.02)';
+      this.style.boxShadow = '0 12px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.15)';
+    };
+    GLOBAL_ISLAND.onmouseleave = function() {
+      this.style.transform = 'translateX(-50%) scale(1)';
+      this.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)';
+    };
+
+    document.body.appendChild(GLOBAL_ISLAND);
+
+    // 启动歌词更新定时器
+    startIslandLyricUpdate();
+  }
+
+  function updateIslandLyric(lyricElement) {
+    if (!lyricElement) {
+      lyricElement = document.getElementById('island-lyric');
+    }
+    if (!lyricElement) return;
+
+    if (STATE.lyric.length === 0) {
+      lyricElement.textContent = STATE.currentSong.artists || STATE.currentSong.artist;
+      return;
+    }
+
+    var currentLyric = '';
+    for (var i = 0; i < STATE.lyric.length; i++) {
+      if (STATE.lyric[i].t <= STATE.currentTime) {
+        currentLyric = STATE.lyric[i].text;
+      } else {
+        break;
+      }
+    }
+    lyricElement.textContent = currentLyric || (STATE.currentSong.artists || STATE.currentSong.artist);
+  }
+
+  function updateIslandPlayBtn() {
+    var playBtn = document.getElementById('island-play-btn');
+    if (!playBtn) return;
+
+    var playIcon = STATE.isPlaying ?
+      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>' :
+      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M232,114.5,88,26.5A8,8,0,0,0,76,33V223a8,8,0,0,0,12,6.5l144-88a8,8,0,0,0,0-13Z"/></svg>';
+    playBtn.innerHTML = playIcon;
+  }
+
+  function updateIslandInfo() {
+    if (!GLOBAL_ISLAND) return;
+
+    // 更新封面
+    var cover = GLOBAL_ISLAND.querySelector('img');
+    if (cover && STATE.currentSong) {
+      cover.src = STATE.currentSong.pic || STATE.currentSong.albumPic;
+    }
+
+    // 更新歌名
+    var songName = GLOBAL_ISLAND.querySelector('div > div:first-child');
+    if (songName && STATE.currentSong) {
+      songName.textContent = STATE.currentSong.name;
+    }
+
+    // 更新歌词
+    updateIslandLyric();
+  }
+
+  var islandLyricTimer = null;
+  function startIslandLyricUpdate() {
+    if (islandLyricTimer) clearInterval(islandLyricTimer);
+    islandLyricTimer = setInterval(function() {
+      if (GLOBAL_ISLAND && STATE.isPlaying) {
+        updateIslandLyric();
+      }
+    }, 500);
+  }
+
+  function removeGlobalIsland() {
+    if (GLOBAL_ISLAND) {
+      document.body.removeChild(GLOBAL_ISLAND);
+      GLOBAL_ISLAND = null;
+    }
+    if (islandLyricTimer) {
+      clearInterval(islandLyricTimer);
+      islandLyricTimer = null;
+    }
   }
 
   // ==================== 导出 ====================
@@ -3328,9 +3564,16 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           }
         },
         unmount: function(container) {
-          if (STATE.audio) {
-            STATE.audio.pause();
-            STATE.audio = null;
+          // 如果有正在播放的歌曲，显示全局灵动岛
+          if (STATE.currentSong && STATE.audio) {
+            createGlobalIsland();
+            // 不销毁 Audio 对象，让音乐继续播放
+          } else {
+            // 没有歌曲时才清理 Audio
+            if (STATE.audio) {
+              STATE.audio.pause();
+              STATE.audio = null;
+            }
           }
           container.replaceChildren();
         }
