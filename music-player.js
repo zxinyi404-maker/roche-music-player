@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-01:40-v3.7.1-profile-settings-btn';
+  var BUILD_TIME = '2026-08-02-01:50-v3.7.2-search-close-vip-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1417,11 +1417,14 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var userBadges = document.createElement('div');
     userBadges.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px';
 
-    var vipLabel = STATE.userProfile.vipType ? (STATE.userProfile.vipType === 11 ? 'SVIP' : 'VIP') : '普通用户';
-    var vipBadge = document.createElement('span');
-    vipBadge.textContent = vipLabel;
-    vipBadge.style.cssText = `font-size:9px;padding:2px 8px;border-radius:20px;color:white;font-weight:600;background:linear-gradient(135deg, ${C.vip}, #e0b88a);letter-spacing:0.05em`;
-    userBadges.appendChild(vipBadge);
+    // VIP 标签 - 照抄 SullyOS
+    if (STATE.userProfile.vipType) {
+      var vipLabel = STATE.userProfile.vipType === 11 ? '黑胶 SVIP' : 'VIP';
+      var vipBadge = document.createElement('span');
+      vipBadge.textContent = vipLabel;
+      vipBadge.style.cssText = `font-size:9px;padding:2px 8px;border-radius:20px;color:white;font-weight:600;background:linear-gradient(135deg, ${C.vip}, #e0b88a);letter-spacing:0.05em`;
+      userBadges.appendChild(vipBadge);
+    }
 
     var uidBadge = document.createElement('span');
     uidBadge.textContent = 'UID · ' + STATE.userProfile.userId;
@@ -1620,6 +1623,19 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
+    // 左侧关闭按钮
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'shizuku-btn-hover';
+    closeBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    closeBtn.appendChild(svg('x', 16, C.primary));
+    closeBtn.onclick = function() {
+      if (STATE.roche && STATE.roche.ui && STATE.roche.ui.closeApp) {
+        STATE.roche.ui.closeApp();
+      }
+    };
+    header.appendChild(closeBtn);
+
+    // 中间标题
     var titleBox = document.createElement('div');
     titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
     titleBox.appendChild(sparkle(7, C.glow, 0));
@@ -1632,21 +1648,22 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     titleBox.appendChild(waterDrop(5));
     titleBox.appendChild(sparkle(7, C.sakura, 1.2));
+    header.appendChild(titleBox);
 
+    // 右侧按钮
     var rightBtns = document.createElement('div');
-    rightBtns.style.cssText = 'display:flex;gap:8px';
+    rightBtns.style.cssText = 'display:flex;gap:4px';
 
     var profileBtn = document.createElement('button');
-    profileBtn.textContent = '👤';
     profileBtn.className = 'shizuku-btn-hover';
-    profileBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
+    profileBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    profileBtn.appendChild(svg('chevron-left', 16, C.primary));
     profileBtn.onclick = function() {
       STATE.currentView = 'profile';
       createUI();
     };
     rightBtns.appendChild(profileBtn);
 
-    header.appendChild(titleBox);
     header.appendChild(rightBtns);
     container.appendChild(header);
 
@@ -2544,7 +2561,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.7.1',
+      version: '3.7.2',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
