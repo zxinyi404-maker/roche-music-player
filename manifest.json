@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.4.2",
-  "description": "✨ 搜索页美化：水晶胶囊搜索栏+星芒空状态（精确照抄SullyOS排版）",
+  "version": "3.5.0",
+  "description": "✨ Shizuku 美化框架完成：统一背景装饰、星芒水滴、精致唱片、歌词装饰（完全照抄SullyOS）",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

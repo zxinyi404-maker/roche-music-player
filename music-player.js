@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-23:00-v3.4.2-search';
+  var BUILD_TIME = '2026-08-01-23:30-v3.5.0-shizuku-enhanced';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -112,6 +112,7 @@
 @keyframes shizuku-vinyl{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes shizuku-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes shizuku-drop{0%{transform:translateY(-30px) scale(0);opacity:0}40%{opacity:.7}100%{transform:translateY(100vh) scale(1);opacity:0}}
+@keyframes shizuku-pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:.9}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes wave{0%,100%{height:8px}50%{height:16px}}
 .shizuku-glass{background:rgba(255,255,255,0.22);backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);border:1px solid rgba(255,255,255,0.35)}
@@ -135,6 +136,11 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
 /* iOS 滚动优化 */
 .shizuku-scrollbar { -webkit-overflow-scrolling: touch; }
+
+/* 按钮悬停效果 */
+.shizuku-btn-hover{transition:all 0.2s ease}
+.shizuku-btn-hover:hover{transform:translateY(-1px);box-shadow:0 4px 20px ${C.glow}25}
+.shizuku-btn-hover:active{transform:translateY(0)}
 `;
     document.head.appendChild(style);
   }
@@ -163,6 +169,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     return s;
   }
 
+  // 星芒装饰
   function sparkle(size, color, delay) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     s.setAttribute('width', size || 10);
@@ -175,6 +182,55 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     p.setAttribute('d', 'M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8 Z');
     s.appendChild(p);
     return s;
+  }
+
+  // 水滴装饰
+  function waterDrop(size) {
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('width', size || 8);
+    s.setAttribute('height', (size || 8) * 1.4);
+    s.setAttribute('viewBox', '0 0 10 14');
+    s.setAttribute('fill', C.glow);
+    s.style.opacity = '0.4';
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', 'M5 0 C5 0 0 7 0 9.5 C0 12 2.2 14 5 14 C7.8 14 10 12 10 9.5 C10 7 5 0 5 0Z');
+    s.appendChild(p);
+    return s;
+  }
+
+  // 创建背景装饰层（完全照抄 SullyOS 的 BokehBg）
+  function createBokehBg() {
+    var bokeh = document.createElement('div');
+    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0';
+
+    // 主光球 - 右上角浮游
+    var mainOrb = document.createElement('div');
+    mainOrb.style.cssText = `
+      position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
+      background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+      animation:shizuku-float 8s ease-in-out infinite;
+    `;
+    bokeh.appendChild(mainOrb);
+
+    // 次要光球 - 左下角
+    var subOrb = document.createElement('div');
+    subOrb.style.cssText = `
+      position:absolute;bottom:15%;left:8%;width:96px;height:96px;border-radius:50%;
+      background:radial-gradient(circle, ${C.lavender}50, transparent 65%);
+      animation:shizuku-drift 12s ease-in-out infinite;
+    `;
+    bokeh.appendChild(subOrb);
+
+    // 小星芒散落
+    for (var i = 0; i < 6; i++) {
+      var star = sparkle(6 + Math.random() * 4, i % 2 === 0 ? C.glow : C.sakura, Math.random() * 2);
+      star.style.position = 'absolute';
+      star.style.top = (10 + Math.random() * 70) + '%';
+      star.style.left = (10 + Math.random() * 80) + '%';
+      bokeh.appendChild(star);
+    }
+
+    return bokeh;
   }
 
   // ==================== 存储管理 ====================
@@ -459,16 +515,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     // 背景装饰
-    var bokeh = document.createElement('div');
-    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
-    bokeh.innerHTML = `
-      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
-        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
-        animation:shizuku-float 8s ease-in-out infinite"></div>
-    `;
-    container.appendChild(bokeh);
+    container.appendChild(createBokehBg());
 
-    // 头部
+    // 头部 - 带装饰
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
@@ -476,7 +525,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
     var backBtn = document.createElement('button');
-    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary}`;
+    backBtn.className = 'shizuku-btn-hover';
+    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%`;
     backBtn.appendChild(svg('x', 16, C.primary));
     backBtn.onclick = function() {
       if (STATE.qrPollTimer) {
@@ -494,11 +544,20 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         }
       }
     };
+
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
+    titleBox.appendChild(sparkle(7, C.glow, 0));
+
     var title = document.createElement('div');
     title.textContent = '登录网易云';
-    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    titleBox.appendChild(title);
+
+    titleBox.appendChild(sparkle(7, C.sakura, 1.2));
+
     header.appendChild(backBtn);
-    header.appendChild(title);
+    header.appendChild(titleBox);
     header.appendChild(document.createElement('div')); // placeholder
     container.appendChild(header);
 
@@ -1313,17 +1372,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       display:flex;flex-direction:column;
     `;
 
-    // 背景装饰
-    var bokeh = document.createElement('div');
-    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
-    bokeh.innerHTML = `
-      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
-        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
-        animation:shizuku-float 8s ease-in-out infinite"></div>
-    `;
-    container.appendChild(bokeh);
+    // 背景装饰 - 使用统一的 BokehBg
+    container.appendChild(createBokehBg());
 
-    // 头部
+    // 头部 - 带装饰元素
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
@@ -1331,16 +1383,26 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
+    titleBox.appendChild(sparkle(7, C.glow, 0));
+    titleBox.appendChild(waterDrop(5));
+
     var title = document.createElement('div');
     title.textContent = 'My Cloud';
-    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    titleBox.appendChild(title);
+
+    titleBox.appendChild(waterDrop(5));
+    titleBox.appendChild(sparkle(7, C.sakura, 1.2));
 
     var rightBtns = document.createElement('div');
     rightBtns.style.cssText = 'display:flex;gap:8px';
 
     var searchBtn = document.createElement('button');
     searchBtn.textContent = '🔍';
-    searchBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px`;
+    searchBtn.className = 'shizuku-btn-hover';
+    searchBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
     searchBtn.onclick = function() {
       STATE.currentView = 'search';
       createUI();
@@ -1349,13 +1411,14 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     var settingsBtn = document.createElement('button');
     settingsBtn.textContent = '⚙️';
-    settingsBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px`;
+    settingsBtn.className = 'shizuku-btn-hover';
+    settingsBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
     settingsBtn.onclick = function() {
       showProxySettings();
     };
     rightBtns.appendChild(settingsBtn);
 
-    header.appendChild(title);
+    header.appendChild(titleBox);
     header.appendChild(rightBtns);
     container.appendChild(header);
 
@@ -1435,25 +1498,38 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   function createQuickBtn(emoji, text, onclick) {
     var btn = document.createElement('button');
-    btn.className = 'shizuku-glass';
+    btn.className = 'shizuku-glass shizuku-btn-hover';
     btn.style.cssText = `
-      padding:16px;border-radius:16px;border:none;cursor:pointer;
+      padding:16px 12px;border-radius:16px;border:none;cursor:pointer;
       display:flex;flex-direction:column;align-items:center;gap:8px;
-      transition:all 0.2s;
+      transition:all 0.2s;position:relative;overflow:hidden;
     `;
+    btn.onclick = onclick;
+
+    // 背景扫光效果
+    var shimmer = document.createElement('div');
+    shimmer.style.cssText = `
+      position:absolute;inset:0;opacity:0;transition:opacity 0.3s;
+      background:linear-gradient(135deg, transparent, rgba(255,255,255,0.2), transparent);
+      background-size:200% 200%;
+    `;
+    btn.appendChild(shimmer);
+
     btn.onmouseenter = function() {
-      btn.style.background = C.glass;
-      btn.style.boxShadow = '0 4px 20px ' + C.glow + '20';
+      shimmer.style.opacity = '1';
     };
     btn.onmouseleave = function() {
-      btn.style.background = 'rgba(255,255,255,0.22)';
-      btn.style.boxShadow = 'none';
+      shimmer.style.opacity = '0';
     };
-    btn.onclick = onclick;
-    btn.innerHTML = `
+
+    var content = document.createElement('div');
+    content.style.cssText = 'position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;gap:8px';
+    content.innerHTML = `
       <div style="font-size:24px">${emoji}</div>
-      <div style="font-size:11px;color:${C.primary}">${text}</div>
+      <div style="font-size:11px;color:${C.primary};letter-spacing:0.05em">${text}</div>
     `;
+    btn.appendChild(content);
+
     return btn;
   }
 
@@ -1467,16 +1543,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     // 背景装饰
-    var bokeh = document.createElement('div');
-    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
-    bokeh.innerHTML = `
-      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
-        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
-        animation:shizuku-float 8s ease-in-out infinite"></div>
-    `;
-    container.appendChild(bokeh);
+    container.appendChild(createBokehBg());
 
-    // 头部
+    // 头部 - 带装饰
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
@@ -1484,27 +1553,37 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
+    titleBox.appendChild(sparkle(7, C.glow, 0));
+    titleBox.appendChild(waterDrop(5));
+
     var title = document.createElement('div');
     title.textContent = '未来音楽';
-    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    titleBox.appendChild(title);
+
+    titleBox.appendChild(waterDrop(5));
+    titleBox.appendChild(sparkle(7, C.sakura, 1.2));
 
     var rightBtns = document.createElement('div');
     rightBtns.style.cssText = 'display:flex;gap:8px';
 
     var profileBtn = document.createElement('button');
     profileBtn.textContent = '👤';
-    profileBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px`;
+    profileBtn.className = 'shizuku-btn-hover';
+    profileBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
     profileBtn.onclick = function() {
       STATE.currentView = 'profile';
       createUI();
     };
     rightBtns.appendChild(profileBtn);
 
-    header.appendChild(title);
+    header.appendChild(titleBox);
     header.appendChild(rightBtns);
     container.appendChild(header);
 
-    // 搜索栏
+    // 搜索栏 - 水晶胶囊风格
     var searchBox = document.createElement('div');
     searchBox.style.cssText = 'padding:12px;position:relative;z-index:10';
 
@@ -1516,7 +1595,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       box-shadow:0 2px 20px ${C.glow}15,inset 0 1px 0 rgba(255,255,255,0.4);
     `;
 
-    searchInputWrap.appendChild(svg('search', 15, C.muted));
+    var searchIcon = svg('search', 15, C.muted);
+    searchInputWrap.appendChild(searchIcon);
 
     var searchInput = document.createElement('input');
     searchInput.placeholder = '搜一首想听的歌...';
@@ -1530,18 +1610,37 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       }
     };
 
+    // 添加星芒装饰
+    var sparkleDecor = sparkle(6, C.sakura, 0.5);
+    searchInputWrap.appendChild(searchInput);
+    searchInputWrap.appendChild(sparkleDecor);
+
     var searchBtn = document.createElement('button');
     searchBtn.textContent = '搜索';
+    searchBtn.className = 'shizuku-btn-hover';
     searchBtn.style.cssText = `
-      padding:6px 12px;border-radius:10px;border:none;cursor:pointer;
-      font-size:11px;color:white;
+      margin-left:8px;padding:8px 14px;border-radius:16px;border:none;cursor:pointer;
+      font-size:11px;color:white;position:relative;overflow:hidden;
       background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      box-shadow:0 3px 15px ${C.primary}30;
     `;
+    // 扫光效果
+    var shimmer = document.createElement('div');
+    shimmer.style.cssText = `
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%);
+      background-size:200% 100%;animation:shizuku-shimmer 3s ease-in-out infinite;
+    `;
+    searchBtn.appendChild(shimmer);
+    var btnText = document.createElement('span');
+    btnText.textContent = '搜索';
+    btnText.style.position = 'relative';
+    btnText.style.zIndex = '10';
+    searchBtn.appendChild(btnText);
     searchBtn.onclick = function() {
       doSearch(searchInput.value);
     };
 
-    searchInputWrap.appendChild(searchInput);
     searchBox.appendChild(searchInputWrap);
     searchBox.appendChild(searchBtn);
     container.appendChild(searchBox);
@@ -1554,10 +1653,34 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     if (STATE.searchResults.length === 0) {
       var empty = document.createElement('div');
       empty.style.cssText = `text-align:center;padding:60px 20px;color:${C.faint}`;
-      empty.innerHTML = `
-        <div style="font-size:32px;margin-bottom:12px">✨</div>
-        <div style="font-size:12px;font-style:italic">搜一首想听的歌吧</div>
-      `;
+
+      // 星芒装饰组
+      var sparkleGroup = document.createElement('div');
+      sparkleGroup.style.cssText = 'position:relative;display:inline-block;margin-bottom:16px';
+      var mainSparkle = sparkle(24, C.glow, 0);
+      mainSparkle.style.display = 'block';
+      mainSparkle.style.margin = '0 auto';
+      sparkleGroup.appendChild(mainSparkle);
+
+      var topRightSparkle = sparkle(12, C.sakura, 0.8);
+      topRightSparkle.style.position = 'absolute';
+      topRightSparkle.style.top = '-4px';
+      topRightSparkle.style.right = '-12px';
+      sparkleGroup.appendChild(topRightSparkle);
+
+      var bottomLeftSparkle = sparkle(8, C.lavender, 1.5);
+      bottomLeftSparkle.style.position = 'absolute';
+      bottomLeftSparkle.style.bottom = '-8px';
+      bottomLeftSparkle.style.left = '-8px';
+      sparkleGroup.appendChild(bottomLeftSparkle);
+
+      empty.appendChild(sparkleGroup);
+
+      var emptyText = document.createElement('div');
+      emptyText.textContent = '搜一首想听的歌吧';
+      emptyText.style.cssText = `font-size:12px;font-style:italic;font-family:'Georgia',serif`;
+      empty.appendChild(emptyText);
+
       resultsList.appendChild(empty);
     } else {
       STATE.searchResults.forEach(function(song, idx) {
@@ -1805,16 +1928,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     // 背景装饰
-    var bokeh = document.createElement('div');
-    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
-    bokeh.innerHTML = `
-      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
-        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
-        animation:shizuku-float 8s ease-in-out infinite"></div>
-    `;
-    container.appendChild(bokeh);
+    container.appendChild(createBokehBg());
 
-    // 头部
+    // 头部 - 带装饰
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
@@ -1823,19 +1939,27 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     var backBtn = document.createElement('button');
-    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary}`;
+    backBtn.className = 'shizuku-btn-hover';
+    backBtn.style.cssText = `padding:8px;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%`;
     backBtn.appendChild(svg('chevron-left', 20, C.primary));
     backBtn.onclick = function() {
       STATE.currentView = 'search';
       createUI();
     };
 
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
+    titleBox.appendChild(sparkle(7, C.glow, 0));
+
     var title = document.createElement('div');
     title.textContent = 'Now Playing';
-    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary}`;
+    title.style.cssText = `font-size:15px;letter-spacing:0.15em;font-weight:300;color:${C.primary};font-family:'Georgia',serif`;
+    titleBox.appendChild(title);
+
+    titleBox.appendChild(sparkle(7, C.sakura, 1.2));
 
     header.appendChild(backBtn);
-    header.appendChild(title);
+    header.appendChild(titleBox);
     header.appendChild(document.createElement('div')); // placeholder
     container.appendChild(header);
 
@@ -1843,7 +1967,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var content = document.createElement('div');
     content.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;padding:20px;overflow:hidden;position:relative;z-index:10';
 
-    // 唱片封面（带旋转动画）
+    // 唱片封面（带旋转动画）- 更精致的设计
     var vinylBox = document.createElement('div');
     vinylBox.style.cssText = 'position:relative;margin-top:20px';
 
@@ -1851,20 +1975,56 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     vinyl.style.cssText = `
       width:200px;height:200px;border-radius:50%;
       background:linear-gradient(135deg, ${C.bgDeep}, ${C.bg});
-      box-shadow:0 8px 32px rgba(0,0,0,0.15),inset 0 0 0 8px rgba(255,255,255,0.1);
+      box-shadow:0 8px 32px rgba(0,0,0,0.15),inset 0 0 0 8px rgba(255,255,255,0.1),
+                 0 0 0 1px ${C.faint}30;
       display:flex;align-items:center;justify-content:center;
       animation:${STATE.isPlaying ? 'shizuku-vinyl 3s linear infinite' : 'none'};
+      position:relative;
     `;
+
+    // 内圈光晕
+    var innerGlow = document.createElement('div');
+    innerGlow.style.cssText = `
+      position:absolute;inset:0;border-radius:50%;
+      box-shadow:inset 0 0 30px ${C.glow}20;
+      pointer-events:none;
+    `;
+    vinyl.appendChild(innerGlow);
 
     var albumCover = document.createElement('img');
     albumCover.src = STATE.currentSong.pic;
     albumCover.style.cssText = `
       width:160px;height:160px;border-radius:50%;
-      object-fit:cover;
-      box-shadow:0 4px 16px rgba(0,0,0,0.2);
+      object-fit:cover;position:relative;z-index:2;
+      box-shadow:0 4px 16px rgba(0,0,0,0.2),0 0 0 2px rgba(255,255,255,0.3);
     `;
 
     vinyl.appendChild(albumCover);
+
+    // 播放时的星芒装饰
+    if (STATE.isPlaying) {
+      var topSparkle = sparkle(10, C.glow, 0);
+      topSparkle.style.position = 'absolute';
+      topSparkle.style.top = '-8px';
+      topSparkle.style.left = '50%';
+      topSparkle.style.transform = 'translateX(-50%)';
+      vinylBox.appendChild(topSparkle);
+
+      var rightSparkle = sparkle(8, C.sakura, 0.8);
+      rightSparkle.style.position = 'absolute';
+      rightSparkle.style.top = '50%';
+      rightSparkle.style.right = '-8px';
+      rightSparkle.style.transform = 'translateY(-50%)';
+      vinylBox.appendChild(rightSparkle);
+
+      var leftSparkle = sparkle(8, C.lavender, 1.5);
+      leftSparkle.style.position = 'absolute';
+      leftSparkle.style.top = '50%';
+      leftSparkle.style.left = '-8px';
+      leftSparkle.style.transform = 'translateY(-50%)';
+      vinylBox.appendChild(leftSparkle);
+    }
+
     vinylBox.appendChild(vinyl);
     content.appendChild(vinylBox);
 
@@ -1915,19 +2075,33 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     progressBox.appendChild(timeLabels);
     content.appendChild(progressBox);
 
-    // 控制按钮
+    // 控制按钮 - 更精致的设计
     var controls = document.createElement('div');
     controls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:32px;margin-top:24px';
 
     var prevBtn = document.createElement('button');
-    prevBtn.style.cssText = `padding:12px;border-radius:50%;border:none;background:transparent;cursor:pointer;color:${C.muted};transition:all 0.2s`;
+    prevBtn.className = 'shizuku-btn-hover';
+    prevBtn.style.cssText = `
+      padding:12px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);
+      cursor:pointer;color:${C.muted};transition:all 0.2s;
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    `;
     prevBtn.appendChild(svg('skip-back', 28, C.muted));
     prevBtn.onclick = playPrev;
+    prevBtn.onmouseenter = function() {
+      this.style.background = 'rgba(255,255,255,0.25)';
+      this.style.transform = 'scale(1.05)';
+    };
+    prevBtn.onmouseleave = function() {
+      this.style.background = 'rgba(255,255,255,0.15)';
+      this.style.transform = 'scale(1)';
+    };
 
     var playBtn = document.createElement('button');
+    playBtn.className = 'shizuku-btn-hover';
     playBtn.style.cssText = `
       width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
+      display:flex;align-items:center;justify-content:center;position:relative;
       background:linear-gradient(135deg, ${C.primary}, ${C.accent});
       box-shadow:0 4px 20px ${C.glow}40;transition:all 0.2s;
     `;
@@ -1936,10 +2110,28 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 28, 'white'));
     playBtn.onclick = togglePlay;
 
+    // 播放按钮的光晕动画
+    if (STATE.isPlaying) {
+      playBtn.style.animation = 'shizuku-glow 2s ease-in-out infinite';
+    }
+
     var nextBtn = document.createElement('button');
-    nextBtn.style.cssText = `padding:12px;border-radius:50%;border:none;background:transparent;cursor:pointer;color:${C.muted};transition:all 0.2s`;
+    nextBtn.className = 'shizuku-btn-hover';
+    nextBtn.style.cssText = `
+      padding:12px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);
+      cursor:pointer;color:${C.muted};transition:all 0.2s;
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    `;
     nextBtn.appendChild(svg('skip-forward', 28, C.muted));
     nextBtn.onclick = playNext;
+    nextBtn.onmouseenter = function() {
+      this.style.background = 'rgba(255,255,255,0.25)';
+      this.style.transform = 'scale(1.05)';
+    };
+    nextBtn.onmouseleave = function() {
+      this.style.background = 'rgba(255,255,255,0.15)';
+      this.style.transform = 'scale(1)';
+    };
 
     controls.appendChild(prevBtn);
     controls.appendChild(playBtn);
@@ -1958,10 +2150,18 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     if (STATE.lyric.length === 0) {
       var emptyLyric = document.createElement('div');
       emptyLyric.style.cssText = `padding:40px 0;color:${C.faint}`;
-      emptyLyric.innerHTML = `
-        <div style="font-size:24px;margin-bottom:8px">✨</div>
-        <div style="font-size:11px;font-style:italic">暂无歌词</div>
-      `;
+
+      // 星芒装饰
+      var sparkleDecor = sparkle(24, C.glow, 0);
+      sparkleDecor.style.display = 'block';
+      sparkleDecor.style.margin = '0 auto 12px';
+      emptyLyric.appendChild(sparkleDecor);
+
+      var emptyText = document.createElement('div');
+      emptyText.textContent = '暂无歌词';
+      emptyText.style.cssText = `font-size:11px;font-style:italic;font-family:'Georgia',serif`;
+      emptyLyric.appendChild(emptyText);
+
       lyricBox.appendChild(emptyLyric);
     } else {
       STATE.lyric.forEach(function(line, idx) {
@@ -1974,8 +2174,26 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           line-height:1.6;transition:all 0.3s ease;
           color:${isActive ? C.primary : C.muted};
           font-weight:${isActive ? '600' : '400'};
-          cursor:pointer;
+          cursor:pointer;position:relative;
         `;
+
+        // 当前行添加星芒装饰
+        if (isActive) {
+          var leftStar = sparkle(6, C.sakura, 0);
+          leftStar.style.position = 'absolute';
+          leftStar.style.left = '8px';
+          leftStar.style.top = '50%';
+          leftStar.style.transform = 'translateY(-50%)';
+          lyricLine.appendChild(leftStar);
+
+          var rightStar = sparkle(6, C.sakura, 0.5);
+          rightStar.style.position = 'absolute';
+          rightStar.style.right = '8px';
+          rightStar.style.top = '50%';
+          rightStar.style.transform = 'translateY(-50%)';
+          lyricLine.appendChild(rightStar);
+        }
+
         lyricLine.onclick = function() {
           if (STATE.audio) STATE.audio.currentTime = line.t;
         };
@@ -2008,14 +2226,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     // 背景装饰
-    var bokeh = document.createElement('div');
-    bokeh.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
-    bokeh.innerHTML = `
-      <div style="position:absolute;top:8%;right:5%;width:128px;height:128px;border-radius:50%;
-        background:radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
-        animation:shizuku-float 8s ease-in-out infinite"></div>
-    `;
-    container.appendChild(bokeh);
+    container.appendChild(createBokehBg());
 
     // 头部
     var header = document.createElement('div');
@@ -2192,7 +2403,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.4.2',
+      version: '3.5.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
