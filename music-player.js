@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-01:00-v3.6.1-search-user-status';
+  var BUILD_TIME = '2026-08-02-01:10-v3.6.2-final-polish';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -511,7 +511,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
-      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
     var backBtn = document.createElement('button');
@@ -1504,7 +1504,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
-      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
@@ -1941,7 +1941,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
-      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
@@ -2261,7 +2261,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var header = document.createElement('div');
     header.className = 'shizuku-glass-strong ios-safe-top';
     header.style.cssText = `
-      padding:15px;display:flex;justify-content:space-between;align-items:center;
+      padding-left:15px;padding-right:15px;padding-bottom:15px;display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
     var backBtn = document.createElement('button');
@@ -2432,7 +2432,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.6.1',
+      version: '3.6.2',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
