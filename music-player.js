@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-05:45-v3.13.3-fix-data-parse';
+  var BUILD_TIME = '2026-08-02-06:00-v3.14.0-use-correct-api';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -284,6 +284,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   function neteasePersonalFm() { return neteaseCall('/personal_fm', {}); }
   function neteaseDailySignin() { return neteaseCall('/daily_signin', { type: 1 }); }
   function neteaseRecordRecentSong(uid) { return neteaseCall('/record/recent/song', { uid }); }
+  function neteaseUserRecord(uid, type) { return neteaseCall('/user/record', { uid, type: type || 1 }); }
 
   // ==================== 登录功能 ====================
 
@@ -314,7 +315,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     Promise.allSettled([
       neteaseUserPlaylist(STATE.userProfile.userId),
-      neteaseRecordRecentSong(STATE.userProfile.userId),
+      neteaseUserRecord(STATE.userProfile.userId, 1),
       neteaseCall('/user/cloud', { limit: 200 }),
       neteaseCall('/likelist', {})
     ]).then(function(results) {
