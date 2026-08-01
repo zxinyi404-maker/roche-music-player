@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-09:45-v3.17.2-fix-iphone-x';
+  var BUILD_TIME = '2026-08-02-10:00-v3.17.3-fix-safe-area';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -3381,12 +3381,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     if (!STATE.currentSong) return;
 
-    // 创建灵动岛容器（紧凑模式）
+    // 创建灵动岛容器（紧凑模式，适配刘海屏）
     GLOBAL_ISLAND = document.createElement('div');
     GLOBAL_ISLAND.id = 'roche-music-island';
-    GLOBAL_ISLAND.className = 'ios-safe-top';
     GLOBAL_ISLAND.style.cssText = `
-      position:fixed;top:50px;left:50%;transform:translateX(-50%);
+      position:fixed;
+      top:calc(env(safe-area-inset-top, 0px) + 50px);
+      left:50%;transform:translateX(-50%);
       z-index:999999;
       background:rgba(20,20,25,0.95);
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
