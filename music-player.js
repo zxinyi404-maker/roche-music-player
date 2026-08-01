@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-12:00-v3.20.1-fix-island-sync';
+  var BUILD_TIME = '2026-08-02-12:15-v3.21.0-persist-all';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -254,6 +254,16 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
               STATE.quality = parsed.quality || 'standard';
               STATE.backend = parsed.backend || 'https://sullymeow.ccwu.cc';
               STATE.islandTopOffset = parsed.islandTopOffset || 50;
+              STATE.playMode = parsed.playMode || 'loop';
+              // 恢复播放状态
+              STATE.currentSong = parsed.currentSong || null;
+              STATE.playlist = parsed.playlist || [];
+              STATE.currentIndex = parsed.currentIndex || 0;
+              // 恢复用户数据
+              STATE.userPlaylists = parsed.userPlaylists || [];
+              STATE.playRecord = parsed.playRecord || [];
+              STATE.cloudSongs = parsed.cloudSongs || [];
+              STATE.likedSongs = parsed.likedSongs || [];
               console.log('[从 Roche 存储加载设置]', parsed);
             } catch (e) {
               console.error('[解析设置失败]', e);
@@ -283,6 +293,16 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.quality = data.quality || 'standard';
       STATE.backend = data.backend || 'https://sullymeow.ccwu.cc';
       STATE.islandTopOffset = data.islandTopOffset || 50;
+      STATE.playMode = data.playMode || 'loop';
+      // 恢复播放状态
+      STATE.currentSong = data.currentSong || null;
+      STATE.playlist = data.playlist || [];
+      STATE.currentIndex = data.currentIndex || 0;
+      // 恢复用户数据
+      STATE.userPlaylists = data.userPlaylists || [];
+      STATE.playRecord = data.playRecord || [];
+      STATE.cloudSongs = data.cloudSongs || [];
+      STATE.likedSongs = data.likedSongs || [];
       console.log('[从 localStorage 加载设置]', data);
     } catch (e) {
       console.error('[localStorage 加载失败]', e);
@@ -296,14 +316,24 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       volume: STATE.volume,
       quality: STATE.quality,
       backend: STATE.backend,
-      islandTopOffset: STATE.islandTopOffset
+      islandTopOffset: STATE.islandTopOffset,
+      playMode: STATE.playMode,
+      // 播放状态
+      currentSong: STATE.currentSong,
+      playlist: STATE.playlist,
+      currentIndex: STATE.currentIndex,
+      // 用户数据
+      userPlaylists: STATE.userPlaylists,
+      playRecord: STATE.playRecord,
+      cloudSongs: STATE.cloudSongs,
+      likedSongs: STATE.likedSongs
     };
     var settingsStr = JSON.stringify(settings);
 
     // 同时保存到 Roche 存储和 localStorage
     if (STATE.roche && STATE.roche.storage) {
       STATE.roche.storage.set('rmp-netease-settings', settingsStr).then(function() {
-        console.log('[保存到 Roche 存储成功]', settings);
+        console.log('[保存到 Roche 存储成功]');
       }).catch(function(e) {
         console.error('[Roche 存储保存失败]', e);
       });
@@ -312,7 +342,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     // 降级到 localStorage
     try {
       localStorage.setItem('rmp-netease-settings', settingsStr);
-      console.log('[保存到 localStorage 成功]', settings);
+      console.log('[保存到 localStorage 成功]');
     } catch (e) {
       console.error('[localStorage 保存失败]', e);
     }
@@ -465,6 +495,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       } else {
         console.error('[喜欢列表加载失败]', results[3].reason);
       }
+
+      // 保存所有用户数据到存储
+      saveSettings();
+      console.log('[用户数据已保存到存储]');
 
       // 刷新界面
       if (STATE.currentView === 'profile') {
@@ -1204,6 +1238,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.audio.play().then(function() {
         console.log('[播放成功]');
         STATE.isPlaying = true;
+        // 保存播放状态
+        saveSettings();
         // 重新渲染播放器以更新播放状态
         if (STATE.currentView === 'player') {
           createUI();
