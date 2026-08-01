@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.7.5",
-  "description": "🐛 修复：移除 async 关键字（Roche 不支持 async 函数）",
+  "version": "3.8.0",
+  "description": "🎵 播放功能修复：点击歌曲自动跳转播放器页面",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",

@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:10-v3.7.5-remove-async';
+  var BUILD_TIME = '2026-08-02-02:20-v3.8.0-play-function-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -945,11 +945,19 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     STATE.lyric = [];
     STATE.activeLyricIdx = -1;
 
+    // 跳转到播放器页面
+    STATE.currentView = 'player';
+    createUI();
+
     // 获取歌词
     neteaseLyric(song.id).then(function(data) {
       console.log('[歌词响应]', data);
       STATE.lyric = parseLyric((data.lrc && data.lrc.lyric) || '');
       console.log('[歌词]', STATE.lyric.length + ' 行');
+      // 重新渲染播放器以显示歌词
+      if (STATE.currentView === 'player') {
+        createUI();
+      }
     }).catch(function(e) {
       console.error('[获取歌词失败]', e);
     });
@@ -983,12 +991,15 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.audio.src = url;
       STATE.audio.play().then(function() {
         console.log('[播放成功]');
+        STATE.isPlaying = true;
+        // 重新渲染播放器以更新播放状态
+        if (STATE.currentView === 'player') {
+          createUI();
+        }
       }).catch(function(e) {
         console.error('[播放失败]', e);
         alert('播放失败：' + e.message);
       });
-
-      updateNowPlaying();
     }).catch(function(e) {
       console.error('[获取播放地址失败]', e);
       alert('获取播放地址失败：' + e.message);
@@ -2561,7 +2572,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.7.5',
+      version: '3.8.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
