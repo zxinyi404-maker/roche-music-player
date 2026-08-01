@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-07:00-v3.15.0-player-redesign';
+  var BUILD_TIME = '2026-08-02-07:30-v3.16.0-mini-player';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1824,6 +1824,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     }
 
     container.appendChild(content);
+
+    // 添加底部迷你播放器
+    var miniPlayer = createMiniPlayer();
+    if (miniPlayer) {
+      container.appendChild(miniPlayer);
+    }
+
     STATE.appContainer.innerHTML = '';
     STATE.appContainer.appendChild(container);
   }
@@ -2929,6 +2936,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     }
 
     container.appendChild(content);
+
+    // 添加底部迷你播放器
+    var miniPlayer = createMiniPlayer();
+    if (miniPlayer) {
+      container.appendChild(miniPlayer);
+    }
+
     STATE.appContainer.innerHTML = '';
     STATE.appContainer.appendChild(container);
   }
@@ -3085,8 +3099,134 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     content.appendChild(aboutSection);
 
     container.appendChild(content);
+
+    // 添加底部迷你播放器
+    var miniPlayer = createMiniPlayer();
+    if (miniPlayer) {
+      container.appendChild(miniPlayer);
+    }
+
     STATE.appContainer.innerHTML = '';
     STATE.appContainer.appendChild(container);
+  }
+
+  // ==================== 底部迷你播放器（完全照抄 SullyOS MiniPlayer）====================
+  function createMiniPlayer() {
+    if (!STATE.currentSong) return null;
+
+    var miniPlayer = document.createElement('div');
+    miniPlayer.className = 'shizuku-glass-strong';
+    miniPlayer.style.cssText = `
+      position:absolute;left:12px;right:12px;bottom:12px;z-index:30;
+      border-radius:16px;padding:10px 12px;cursor:pointer;
+      box-shadow:0 4px 30px ${C.glow}20, 0 1px 0 inset rgba(255,255,255,0.4);
+      animation:shizuku-glow 4s ease-in-out infinite;
+    `;
+    miniPlayer.onclick = function() {
+      STATE.currentView = 'player';
+      createUI();
+    };
+
+    // 主内容行
+    var mainRow = document.createElement('div');
+    mainRow.style.cssText = 'display:flex;align-items:center;gap:12px';
+
+    // 封面（水滴圆角）
+    var coverBox = document.createElement('div');
+    coverBox.style.cssText = 'position:relative;flex-shrink:0';
+
+    var cover = document.createElement('img');
+    cover.src = STATE.currentSong.pic || STATE.currentSong.albumPic;
+    cover.style.cssText = `
+      width:40px;height:40px;border-radius:12px;object-fit:cover;
+      border:1.5px solid ${C.accent}40;
+    `;
+    coverBox.appendChild(cover);
+
+    // 播放时的星芒装饰
+    if (STATE.isPlaying) {
+      var coverSparkle = sparkle(8, C.sakura, 0);
+      coverSparkle.style.position = 'absolute';
+      coverSparkle.style.top = '-4px';
+      coverSparkle.style.right = '-4px';
+      coverBox.appendChild(coverSparkle);
+    }
+
+    mainRow.appendChild(coverBox);
+
+    // 歌曲信息
+    var infoBox = document.createElement('div');
+    infoBox.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px';
+
+    var songName = document.createElement('div');
+    songName.textContent = STATE.currentSong.name;
+    songName.style.cssText = `
+      font-size:13px;font-weight:500;color:${C.text};
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    `;
+    infoBox.appendChild(songName);
+
+    var artistName = document.createElement('div');
+    artistName.textContent = STATE.currentSong.artists || STATE.currentSong.artist;
+    artistName.style.cssText = `
+      font-size:10px;color:${C.muted};
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    `;
+    infoBox.appendChild(artistName);
+
+    mainRow.appendChild(infoBox);
+
+    // 控制按钮组
+    var controls = document.createElement('div');
+    controls.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0';
+
+    // 上一曲
+    var prevBtn = document.createElement('button');
+    prevBtn.style.cssText = `
+      padding:6px;border-radius:50%;border:none;background:transparent;
+      cursor:pointer;color:${C.muted};transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    prevBtn.appendChild(svg('skip-back', 14, C.muted));
+    prevBtn.onclick = function(e) {
+      e.stopPropagation();
+      playPrev();
+    };
+    controls.appendChild(prevBtn);
+
+    // 播放/暂停（主按钮）
+    var playBtn = document.createElement('button');
+    playBtn.style.cssText = `
+      padding:8px;border-radius:50%;border:none;cursor:pointer;
+      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      box-shadow:0 2px 10px ${C.primary}30;transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 14, 'white'));
+    playBtn.onclick = function(e) {
+      e.stopPropagation();
+      togglePlay();
+    };
+    controls.appendChild(playBtn);
+
+    // 下一曲
+    var nextBtn = document.createElement('button');
+    nextBtn.style.cssText = `
+      padding:6px;border-radius:50%;border:none;background:transparent;
+      cursor:pointer;color:${C.muted};transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;
+    `;
+    nextBtn.appendChild(svg('skip-forward', 14, C.muted));
+    nextBtn.onclick = function(e) {
+      e.stopPropagation();
+      playNext();
+    };
+    controls.appendChild(nextBtn);
+
+    mainRow.appendChild(controls);
+    miniPlayer.appendChild(mainRow);
+
+    return miniPlayer;
   }
 
   // ==================== UI 构建 ====================
