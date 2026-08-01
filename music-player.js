@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-04:10-v3.12.1-lyric-fix';
+  var BUILD_TIME = '2026-08-02-04:20-v3.13.0-data-sync';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1661,6 +1661,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       var playlistSection = document.createElement('div');
       playlistSection.style.cssText = 'margin:0 16px;position:relative;z-index:10';
 
+      console.log('[渲染歌单 Tab] STATE.userPlaylists.length =', STATE.userPlaylists.length);
+      console.log('[渲染歌单 Tab] STATE.userPlaylists =', STATE.userPlaylists);
+
       if (STATE.userPlaylists.length === 0) {
         var emptyHint = document.createElement('div');
         emptyHint.style.cssText = `text-align:center;padding:40px 20px;color:${C.faint};font-size:11px`;
@@ -3006,7 +3009,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.12.1',
+      version: '3.13.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
