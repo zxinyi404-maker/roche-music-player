@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-01:30-v3.7.0-profile-complete-redesign';
+  var BUILD_TIME = '2026-08-02-01:40-v3.7.1-profile-settings-btn';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -160,7 +160,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       'skip-forward': 'M200,32a8,8,0,0,0-8,8V216a8,8,0,0,0,16,0V40A8,8,0,0,0,200,32Zm-36,86-128-80A8,8,0,0,0,24,46v165a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14Z',
       search: 'M230,218l-43-43a92,92,0,1,0-11,11l43,43a8,8,0,0,0,11-11ZM40,112a72,72,0,1,1,72,72A72,72,0,0,1,40,112Z',
       x: 'M206,194a8,8,0,0,1-11,11L128,139,62,206a8,8,0,0,1-11-11L117,128,51,62A8,8,0,0,1,62,51L128,117l66-66a8,8,0,0,1,11,11L139,128Z',
-      'chevron-left': 'M168,48a8,8,0,0,1,11,11L115,128l64,69a8,8,0,1,1-11,11L96,128Z'
+      'chevron-left': 'M168,48a8,8,0,0,1,11,11L115,128l64,69a8,8,0,1,1-11,11L96,128Z',
+      settings: 'M128,80a48,48,0,1,0,48,48A48,48,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A111.92,111.92,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.63a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8,8,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z'
     };
     var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     p.setAttribute('d', paths[type] || '');
@@ -1323,17 +1324,27 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     // 右侧按钮
     var rightBtns = document.createElement('div');
-    rightBtns.style.cssText = 'display:flex;gap:8px';
+    rightBtns.style.cssText = 'display:flex;gap:4px';
 
     var searchBtn = document.createElement('button');
-    searchBtn.textContent = '🔍';
     searchBtn.className = 'shizuku-btn-hover';
-    searchBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
+    searchBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    searchBtn.appendChild(svg('search', 16, C.primary));
     searchBtn.onclick = function() {
       STATE.currentView = 'search';
       createUI();
     };
     rightBtns.appendChild(searchBtn);
+
+    var settingsBtn = document.createElement('button');
+    settingsBtn.className = 'shizuku-btn-hover';
+    settingsBtn.style.cssText = `width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;color:${C.primary};border-radius:50%;transition:all 0.2s`;
+    settingsBtn.appendChild(svg('settings', 16, C.primary));
+    settingsBtn.onclick = function() {
+      // 设置功能待实现
+      alert('设置功能开发中...');
+    };
+    rightBtns.appendChild(settingsBtn);
 
     header.appendChild(rightBtns);
     container.appendChild(header);
@@ -2533,7 +2544,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.7.0',
+      version: '3.7.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
