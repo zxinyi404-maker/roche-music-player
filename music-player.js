@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-00:30-v3.6.0-profile-redesign';
+  var BUILD_TIME = '2026-08-02-01:00-v3.6.1-search-user-status';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1600,6 +1600,58 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     searchBox.appendChild(searchBtn);
     container.appendChild(searchBox);
 
+    // 用户状态标签 - 照抄 SullyOS
+    if (STATE.userProfile) {
+      var userStatus = document.createElement('div');
+      userStatus.style.cssText = 'padding:0 20px;margin-top:-4px;margin-bottom:6px;position:relative;z-index:10';
+
+      var statusBtn = document.createElement('button');
+      statusBtn.className = 'shizuku-glass shizuku-btn-hover';
+      statusBtn.style.cssText = `
+        display:inline-flex;align-items:center;gap:8px;
+        padding-left:2px;padding-right:12px;padding-top:2px;padding-bottom:2px;
+        border-radius:20px;font-size:10px;color:${C.muted};cursor:pointer;border:none;
+      `;
+      statusBtn.onclick = function() {
+        STATE.currentView = 'profile';
+        createUI();
+      };
+
+      if (STATE.userProfile.avatarUrl) {
+        var miniAvatar = document.createElement('img');
+        miniAvatar.src = STATE.userProfile.avatarUrl;
+        miniAvatar.style.cssText = 'width:20px;height:20px;border-radius:50%;object-fit:cover';
+        statusBtn.appendChild(miniAvatar);
+      } else {
+        statusBtn.appendChild(sparkle(6, C.sakura, 0.3));
+      }
+
+      var statusText = document.createElement('span');
+      statusText.textContent = STATE.userProfile.nickname + ' · ' + (STATE.quality || 'standard');
+      statusBtn.appendChild(statusText);
+
+      userStatus.appendChild(statusBtn);
+      container.appendChild(userStatus);
+    } else {
+      var loginHint = document.createElement('div');
+      loginHint.style.cssText = 'padding:0 20px;margin-top:-4px;margin-bottom:6px;position:relative;z-index:10';
+
+      var loginBtn = document.createElement('button');
+      loginBtn.style.cssText = `
+        display:inline-flex;align-items:center;gap:4px;
+        padding:2px 10px;border-radius:20px;font-size:10px;cursor:pointer;
+        background:${C.vip}18;color:${C.vip};border:1px solid ${C.vip}30;
+      `;
+      loginBtn.textContent = '未登录 — 点击登录网易云';
+      loginBtn.onclick = function() {
+        STATE.currentView = 'profile';
+        createUI();
+      };
+
+      loginHint.appendChild(loginBtn);
+      container.appendChild(loginHint);
+    }
+
     // 结果列表
     var resultsList = document.createElement('div');
     resultsList.className = 'shizuku-scrollbar ios-safe-bottom';
@@ -1956,6 +2008,27 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     `;
 
     vinyl.appendChild(albumCover);
+
+    // Bitrate 标签 - 照抄 SullyOS
+    if (STATE.currentSong.bitrate) {
+      var bitrateLabel = document.createElement('div');
+      bitrateLabel.className = 'shizuku-glass';
+      bitrateLabel.style.cssText = `
+        position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+        padding:2px 8px;border-radius:12px;font-size:9px;color:${C.primary};
+        border:1px solid ${C.primary}30;font-weight:600;letter-spacing:0.05em;
+        pointer-events:none;z-index:3;
+      `;
+      var bitrateMap = {
+        'standard': '128 kbps',
+        'higher': '192 kbps',
+        'exhigh': '320 kbps',
+        'lossless': '1411 kbps',
+        'hires': '24bit · Hi-Res'
+      };
+      bitrateLabel.textContent = bitrateMap[STATE.quality] || STATE.quality || '128 kbps';
+      vinyl.appendChild(bitrateLabel);
+    }
 
     // 播放时的星芒装饰
     if (STATE.isPlaying) {
@@ -2359,7 +2432,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.6.0',
+      version: '3.6.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
