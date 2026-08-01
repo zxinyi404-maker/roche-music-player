@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-11:30-v3.19.0-island-height';
+  var BUILD_TIME = '2026-08-02-11:45-v3.20.0-roche-storage';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -240,6 +240,41 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // ==================== 存储管理 ====================
   function loadSettings() {
+    // 返回 Promise，支持异步加载
+    return new Promise(function(resolve) {
+      // 优先使用 Roche 存储 API
+      if (STATE.roche && STATE.roche.storage) {
+        STATE.roche.storage.get('rmp-netease-settings').then(function(data) {
+          if (data) {
+            try {
+              var parsed = JSON.parse(data);
+              STATE.cookie = parsed.cookie || '';
+              STATE.userProfile = parsed.userProfile || null;
+              STATE.volume = parsed.volume || 0.8;
+              STATE.quality = parsed.quality || 'standard';
+              STATE.backend = parsed.backend || 'https://sullymeow.ccwu.cc';
+              STATE.islandTopOffset = parsed.islandTopOffset || 50;
+              console.log('[从 Roche 存储加载设置]', parsed);
+            } catch (e) {
+              console.error('[解析设置失败]', e);
+            }
+          }
+          resolve();
+        }).catch(function(e) {
+          console.error('[Roche 存储加载失败，降级到 localStorage]', e);
+          // 降级到 localStorage
+          loadFromLocalStorage();
+          resolve();
+        });
+      } else {
+        // 降级到 localStorage
+        loadFromLocalStorage();
+        resolve();
+      }
+    });
+  }
+
+  function loadFromLocalStorage() {
     try {
       var data = JSON.parse(localStorage.getItem('rmp-netease-settings') || '{}');
       STATE.cookie = data.cookie || '';
@@ -248,18 +283,39 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.quality = data.quality || 'standard';
       STATE.backend = data.backend || 'https://sullymeow.ccwu.cc';
       STATE.islandTopOffset = data.islandTopOffset || 50;
-    } catch (e) {}
+      console.log('[从 localStorage 加载设置]', data);
+    } catch (e) {
+      console.error('[localStorage 加载失败]', e);
+    }
   }
 
   function saveSettings() {
-    localStorage.setItem('rmp-netease-settings', JSON.stringify({
+    var settings = {
       cookie: STATE.cookie,
       userProfile: STATE.userProfile,
       volume: STATE.volume,
       quality: STATE.quality,
       backend: STATE.backend,
       islandTopOffset: STATE.islandTopOffset
-    }));
+    };
+    var settingsStr = JSON.stringify(settings);
+
+    // 同时保存到 Roche 存储和 localStorage
+    if (STATE.roche && STATE.roche.storage) {
+      STATE.roche.storage.set('rmp-netease-settings', settingsStr).then(function() {
+        console.log('[保存到 Roche 存储成功]', settings);
+      }).catch(function(e) {
+        console.error('[Roche 存储保存失败]', e);
+      });
+    }
+
+    // 降级到 localStorage
+    try {
+      localStorage.setItem('rmp-netease-settings', settingsStr);
+      console.log('[保存到 localStorage 成功]', settings);
+    } catch (e) {
+      console.error('[localStorage 保存失败]', e);
+    }
   }
 
   // ==================== 网易云 API ====================
@@ -3805,13 +3861,16 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           console.log('[网易云音乐播放器 Shizuku] 初始化', BUILD_TIME);
           STATE.roche = roche;
           STATE.appContainer = container;
-          loadSettings();
-          initAudio();
-          createUI();
-          // 初始化播放模式按钮
-          if (STATE.appRefs.playModeBtn) {
-            updatePlayModeBtn();
-          }
+
+          // 等待设置加载完成后再初始化
+          loadSettings().then(function() {
+            initAudio();
+            createUI();
+            // 初始化播放模式按钮
+            if (STATE.appRefs.playModeBtn) {
+              updatePlayModeBtn();
+            }
+          });
         },
         unmount: function(container) {
           // 如果有正在播放的歌曲，显示全局灵动岛
