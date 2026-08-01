@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:50-v3.10.0-playback-fix';
+  var BUILD_TIME = '2026-08-02-03:00-v3.10.1-api-fix';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -276,7 +276,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   function captchaSent(phone) { return neteaseCall('/captcha/sent', { phone }); }
   function loginCellphone(phone, captcha) { return neteaseCall('/login/cellphone', { phone, captcha }); }
   function neteaseSearch(keyword) { return neteaseCall('/search', { keyword, limit: 30, type: 1 }); }
-  function neteaseSongUrl(id) { return neteaseCall('/song/url', { id, level: STATE.quality }); }
+  function neteaseSongUrl(id) { return neteaseCall('/song/url', { ids: [id], level: STATE.quality }); }
   function neteaseUserPlaylist(uid) { return neteaseCall('/user/playlist', { uid, limit: 100 }); }
   function neteasePlaylistDetail(id) { return neteaseCall('/playlist/detail', { id }); }
   function neteaseRecommendSongs() { return neteaseCall('/recommend/songs', {}); }
@@ -2884,7 +2884,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.10.0',
+      version: '3.10.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',

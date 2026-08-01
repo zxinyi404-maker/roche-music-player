@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.10.0",
-  "description": "🎵 关键修复：所有歌曲数据格式统一，确保能正常播放",
+  "version": "3.10.1",
+  "description": "🐛 关键修复：API参数错误导致无法播放",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
