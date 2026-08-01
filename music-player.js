@@ -472,7 +472,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   }
   function loadUserPlaylists() {
     if (!STATE.userProfile) return;
+    console.log('[开始加载用户歌单]', STATE.userProfile.userId);
     neteaseUserPlaylist(STATE.userProfile.userId).then(function(data) {
+      console.log('[歌单数据响应]', data);
       var playlists = (data.playlist || []).map(function(p) {
         return {
           id: p.id,
@@ -483,7 +485,11 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         };
       });
       STATE.userPlaylists = playlists;
-      console.log('[用户歌单]', playlists.length + ' 个');
+      console.log('[用户歌单加载完成]', playlists.length + ' 个', playlists);
+      // 重新渲染界面以显示歌单
+      if (STATE.currentView === 'profile') {
+        createUI();
+      }
     }).catch(function(e) {
       console.error('[获取歌单失败]', e);
     });
