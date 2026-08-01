@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:00-v3.7.4-es5-syntax-fix';
+  var BUILD_TIME = '2026-08-02-02:10-v3.7.5-remove-async';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -2561,12 +2561,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.7.4',
+      version: '3.7.5',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
         name: '网易云音乐',
-        mount: async function(container, roche) {
+        mount: function(container, roche) {
           console.log('[网易云音乐播放器 Shizuku] 初始化', BUILD_TIME);
           STATE.roche = roche;
           STATE.appContainer = container;
@@ -2578,7 +2578,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
             updatePlayModeBtn();
           }
         },
-        unmount: async function(container) {
+        unmount: function(container) {
           if (STATE.audio) {
             STATE.audio.pause();
             STATE.audio = null;
