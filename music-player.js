@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-03:00-v3.10.1-api-fix';
+  var BUILD_TIME = '2026-08-02-03:10-v3.11.0-player-ui';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -2458,6 +2458,71 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     controls.appendChild(nextBtn);
     content.appendChild(controls);
 
+    // 次要操作栏（喜欢、播放模式、音量）
+    var subActions = document.createElement('div');
+    subActions.style.cssText = 'display:flex;align-items:center;gap:16px;margin-top:20px';
+
+    // 喜欢按钮
+    var isLiked = STATE.likedSongs.indexOf(STATE.currentSong.id) >= 0;
+    var likeBtn = document.createElement('button');
+    likeBtn.className = 'shizuku-btn-hover';
+    likeBtn.style.cssText = `
+      padding:8px;border-radius:50%;border:none;
+      background:${isLiked ? `linear-gradient(135deg, ${C.primary}, ${C.accent})` : 'rgba(255,255,255,0.1)'};
+      cursor:pointer;color:${isLiked ? 'white' : C.muted};transition:all 0.2s;
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    `;
+    likeBtn.innerHTML = isLiked ? '❤️' : '🤍';
+    likeBtn.onclick = function() {
+      toggleLike(STATE.currentSong.id).then(function() {
+        createUI(); // 重新渲染
+      }).catch(function() {});
+    };
+    subActions.appendChild(likeBtn);
+
+    // 播放模式按钮
+    var modeBtn = document.createElement('button');
+    modeBtn.className = 'shizuku-btn-hover';
+    modeBtn.style.cssText = `
+      padding:8px;border-radius:50%;border:none;background:rgba(255,255,255,0.1);
+      cursor:pointer;color:${C.muted};transition:all 0.2s;
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    `;
+    var modeIcon = STATE.playMode === 'loop' ? '🔁' : STATE.playMode === 'single' ? '🔂' : '🔀';
+    modeBtn.textContent = modeIcon;
+    modeBtn.onclick = function() {
+      cyclePlayMode();
+      createUI();
+    };
+    subActions.appendChild(modeBtn);
+
+    // 音量控制
+    var volumeBox = document.createElement('div');
+    volumeBox.style.cssText = 'flex:1;display:flex;align-items:center;gap:8px';
+
+    var volumeIcon = document.createElement('div');
+    volumeIcon.textContent = '🔊';
+    volumeIcon.style.cssText = 'font-size:14px';
+    volumeBox.appendChild(volumeIcon);
+
+    var volumeSlider = document.createElement('input');
+    volumeSlider.type = 'range';
+    volumeSlider.min = '0';
+    volumeSlider.max = '100';
+    volumeSlider.value = String(Math.round(STATE.volume * 100));
+    volumeSlider.style.cssText = `
+      flex:1;height:4px;border-radius:2px;
+      background:rgba(255,255,255,0.2);outline:none;
+      -webkit-appearance:none;appearance:none;
+    `;
+    volumeSlider.oninput = function() {
+      setVolume(parseInt(this.value) / 100);
+    };
+    volumeBox.appendChild(volumeSlider);
+
+    subActions.appendChild(volumeBox);
+    content.appendChild(subActions);
+
     // 歌词显示（滚动）
     var lyricBox = document.createElement('div');
     lyricBox.className = 'shizuku-scrollbar';
@@ -2884,7 +2949,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.10.1',
+      version: '3.11.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
