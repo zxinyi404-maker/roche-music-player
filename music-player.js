@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-05:30-v3.13.2-fix-cloud-api';
+  var BUILD_TIME = '2026-08-02-05:45-v3.13.3-fix-data-parse';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -320,10 +320,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     ]).then(function(results) {
       console.log('[Promise.allSettled 完成]', results);
 
-      // 歌单
+      // 歌单 - 照抄 SullyOS 的数据解析逻辑
       if (results[0].status === 'fulfilled') {
         var plData = results[0].value;
-        STATE.userPlaylists = (plData.playlist || []).map(function(p) {
+        console.log('[歌单 API 原始响应]', plData);
+        // API 可能返回 { playlist: [...] } 或 { data: { playlist: [...] } }
+        var rawList = plData.playlist || (plData.data && plData.data.playlist) || [];
+        STATE.userPlaylists = rawList.map(function(p) {
           return {
             id: p.id,
             name: p.name,
@@ -332,7 +335,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
             creator: p.creator ? p.creator.nickname : ''
           };
         });
-        console.log('[歌单加载完成]', STATE.userPlaylists.length + ' 个');
+        console.log('[歌单加载完成]', STATE.userPlaylists.length + ' 个', STATE.userPlaylists);
       } else {
         console.error('[歌单加载失败]', results[0].reason);
       }
@@ -340,23 +343,26 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       // 播放记录（照抄 SullyOS：weekData）
       if (results[1].status === 'fulfilled') {
         var recData = results[1].value;
-        var weekly = recData.weekData || recData.allData || [];
+        console.log('[播放记录 API 原始响应]', recData);
+        // API 可能返回 { weekData: [...] } 或 { data: { weekData: [...] } }
+        var weekly = recData.weekData || recData.allData || (recData.data && recData.data.list) || [];
         STATE.playRecord = weekly.map(function(r) {
+          var song = r.song || r.data || {};
           return {
-            id: r.song.id,
-            name: r.song.name,
-            artist: (r.song.ar || []).map(function(a) { return a.name; }).join(' / '),
-            artists: (r.song.ar || []).map(function(a) { return a.name; }).join(' / '),
-            album: (r.song.al || {}).name || '',
-            pic: toHttps((r.song.al || {}).picUrl || ''),
-            albumPic: toHttps((r.song.al || {}).picUrl || ''),
-            duration: (r.song.dt || 0) / 1000,
-            fee: r.song.fee || 0,
+            id: song.id,
+            name: song.name,
+            artist: (song.ar || []).map(function(a) { return a.name; }).join(' / '),
+            artists: (song.ar || []).map(function(a) { return a.name; }).join(' / '),
+            album: (song.al || {}).name || '',
+            pic: toHttps((song.al || {}).picUrl || ''),
+            albumPic: toHttps((song.al || {}).picUrl || ''),
+            duration: (song.dt || 0) / 1000,
+            fee: song.fee || 0,
             playCount: r.playCount || 0,
             score: r.score || 0
           };
         });
-        console.log('[播放记录加载完成]', STATE.playRecord.length + ' 首');
+        console.log('[播放记录加载完成]', STATE.playRecord.length + ' 首', STATE.playRecord);
       } else {
         console.error('[播放记录加载失败]', results[1].reason);
       }
