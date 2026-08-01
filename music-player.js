@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-10:15-v3.17.4-fix-captcha';
+  var BUILD_TIME = '2026-08-02-10:30-v3.17.5-fix-captcha-v2';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -916,31 +916,33 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       sendBtn.disabled = true;
       sendBtn.textContent = '发送中...';
 
-      captchaSent(loginState.phone).then(function(r) {
-        console.log('[验证码响应]', r);
-        if (r.code === 200 || r.data === true) {
-          alert('验证码已发送');
-          loginState.cooldown = 60;
-          var countdown = setInterval(function() {
-            loginState.cooldown--;
-            sendBtn.textContent = loginState.cooldown + 's 后重发';
-            if (loginState.cooldown <= 0) {
-              clearInterval(countdown);
-              sendBtn.textContent = '获取验证码';
-              sendBtn.disabled = false;
-            }
-          }, 1000);
-        } else {
-          alert(r.message || '发送失败，请重试');
+      captchaSent(loginState.phone)
+        .then(function(r) {
+          console.log('[验证码响应]', r);
+          if (r?.code === 200 || r?.data === true) {
+            alert('验证码已发送');
+            loginState.cooldown = 60;
+            var countdown = setInterval(function() {
+              loginState.cooldown--;
+              sendBtn.textContent = loginState.cooldown + 's 后重发';
+              if (loginState.cooldown <= 0) {
+                clearInterval(countdown);
+                sendBtn.textContent = '获取验证码';
+                sendBtn.disabled = false;
+              }
+            }, 1000);
+          } else {
+            alert(r?.message || '发送失败');
+            sendBtn.textContent = '获取验证码';
+            sendBtn.disabled = false;
+          }
+        })
+        .catch(function(err) {
+          console.error('[验证码发送失败]', err);
+          alert('发送失败：' + (err.message || '网络错误'));
           sendBtn.textContent = '获取验证码';
           sendBtn.disabled = false;
-        }
-      }).catch(function(err) {
-        console.error('[验证码发送失败]', err);
-        alert('网络错误，请重试');
-        sendBtn.textContent = '获取验证码';
-        sendBtn.disabled = false;
-      });
+        });
     };
 
     captchaHeader.appendChild(captchaLabel);
