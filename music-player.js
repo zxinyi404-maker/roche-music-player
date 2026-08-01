@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-01-23:55-v3.5.2-ios-safe-top-fix';
+  var BUILD_TIME = '2026-08-02-00:10-v3.5.3-remove-proxy-clean';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -23,7 +23,6 @@
   // ==================== 全局状态 ====================
   var STATE = {
     backend: 'https://sullymeow.ccwu.cc',
-    proxyPort: null, // 代理端口，null 表示不使用代理
     cookie: '',
     userProfile: null,
     audio: null,
@@ -241,7 +240,6 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.userProfile = data.userProfile || null;
       STATE.volume = data.volume || 0.8;
       STATE.quality = data.quality || 'standard';
-      STATE.proxyPort = data.proxyPort || null;
     } catch (e) {}
   }
 
@@ -250,21 +248,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       cookie: STATE.cookie,
       userProfile: STATE.userProfile,
       volume: STATE.volume,
-      quality: STATE.quality,
-      proxyPort: STATE.proxyPort
+      quality: STATE.quality
     }));
   }
 
   // ==================== 网易云 API ====================
   function neteaseCall(path, body) {
-    var backendUrl = STATE.backend;
-
-    // 如果设置了代理端口，使用本地代理
-    if (STATE.proxyPort) {
-      backendUrl = 'http://127.0.0.1:' + STATE.proxyPort;
-    }
-
-    return fetch(backendUrl + '/netease' + path, {
+    return fetch(STATE.backend + '/netease' + path, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1282,87 +1272,6 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
   }
 
-  // 显示代理设置
-  function showProxySettings() {
-    var overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,0.5);
-      display:flex;align-items:center;justify-content:center;z-index:9999;
-    `;
-
-    var dialog = document.createElement('div');
-    dialog.className = 'shizuku-glass-strong';
-    dialog.style.cssText = `
-      width:90%;max-width:400px;padding:24px;border-radius:20px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.3);
-    `;
-
-    var title = document.createElement('h3');
-    title.textContent = '代理设置';
-    title.style.cssText = `margin:0 0 16px 0;font-size:18px;color:${C.primary}`;
-    dialog.appendChild(title);
-
-    var label = document.createElement('div');
-    label.textContent = '本地代理端口（如 52262）：';
-    label.style.cssText = `font-size:12px;color:${C.muted};margin-bottom:8px`;
-    dialog.appendChild(label);
-
-    var input = document.createElement('input');
-    input.type = 'number';
-    input.placeholder = '留空使用默认服务器';
-    input.value = STATE.proxyPort || '';
-    input.className = 'shizuku-glass';
-    input.style.cssText = `
-      width:100%;padding:10px 12px;border-radius:12px;border:none;outline:none;
-      font-size:14px;color:${C.text};margin-bottom:16px;
-    `;
-    dialog.appendChild(input);
-
-    var tip = document.createElement('div');
-    tip.textContent = '提示：启动本地网易云 API 服务后填写端口号。留空则使用默认云端服务器。';
-    tip.style.cssText = `font-size:10px;color:${C.faint};margin-bottom:16px;font-style:italic`;
-    dialog.appendChild(tip);
-
-    var btnGroup = document.createElement('div');
-    btnGroup.style.cssText = 'display:flex;gap:12px';
-
-    var cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '取消';
-    cancelBtn.style.cssText = `
-      flex:1;padding:10px;border-radius:12px;border:1px solid ${C.muted};
-      background:transparent;color:${C.muted};cursor:pointer;font-size:13px;
-    `;
-    cancelBtn.onclick = function() {
-      overlay.remove();
-    };
-    btnGroup.appendChild(cancelBtn);
-
-    var saveBtn = document.createElement('button');
-    saveBtn.textContent = '保存';
-    saveBtn.style.cssText = `
-      flex:1;padding:10px;border-radius:12px;border:none;
-      background:linear-gradient(135deg, ${C.primary}, ${C.accent});
-      color:white;cursor:pointer;font-size:13px;
-    `;
-    saveBtn.onclick = function() {
-      var port = input.value.trim();
-      STATE.proxyPort = port ? parseInt(port) : null;
-      saveSettings();
-      alert(STATE.proxyPort ? '代理已设置为：http://127.0.0.1:' + STATE.proxyPort : '已使用默认云端服务器');
-      overlay.remove();
-    };
-    btnGroup.appendChild(saveBtn);
-
-    dialog.appendChild(btnGroup);
-    overlay.appendChild(dialog);
-
-    overlay.onclick = function(e) {
-      if (e.target === overlay) overlay.remove();
-    };
-
-    STATE.appContainer.appendChild(overlay);
-  }
-
   // ==================== 用户主页 UI ====================
   function createProfileView() {
     var container = document.createElement('div');
@@ -1384,6 +1293,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       border-bottom:1px solid rgba(255,255,255,0.3);position:relative;z-index:10;
     `;
 
+    // 左侧占位（保持三栏布局平衡）
+    var leftPlaceholder = document.createElement('div');
+    leftPlaceholder.style.cssText = 'width:32px';
+    header.appendChild(leftPlaceholder);
+
+    // 中间标题
     var titleBox = document.createElement('div');
     titleBox.style.cssText = 'display:flex;align-items:center;gap:6px';
     titleBox.appendChild(sparkle(7, C.glow, 0));
@@ -1396,7 +1311,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     titleBox.appendChild(waterDrop(5));
     titleBox.appendChild(sparkle(7, C.sakura, 1.2));
+    header.appendChild(titleBox);
 
+    // 右侧按钮
     var rightBtns = document.createElement('div');
     rightBtns.style.cssText = 'display:flex;gap:8px';
 
@@ -1410,16 +1327,6 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     };
     rightBtns.appendChild(searchBtn);
 
-    var settingsBtn = document.createElement('button');
-    settingsBtn.textContent = '⚙️';
-    settingsBtn.className = 'shizuku-btn-hover';
-    settingsBtn.style.cssText = `padding:6px;border:none;background:transparent;cursor:pointer;font-size:14px;border-radius:8px`;
-    settingsBtn.onclick = function() {
-      showProxySettings();
-    };
-    rightBtns.appendChild(settingsBtn);
-
-    header.appendChild(titleBox);
     header.appendChild(rightBtns);
     container.appendChild(header);
 
@@ -2405,7 +2312,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.5.2',
+      version: '3.5.3',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
