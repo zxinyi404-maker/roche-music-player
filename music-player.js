@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-07:30-v3.16.0-mini-player';
+  var BUILD_TIME = '2026-08-02-08:00-v3.16.1-fix-progress';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1147,8 +1147,17 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   }
 
   function togglePlay() {
-    if (STATE.isPlaying) STATE.audio.pause();
-    else STATE.audio.play();
+    if (STATE.isPlaying) {
+      STATE.audio.pause();
+    } else {
+      STATE.audio.play();
+    }
+    // 如果在播放器页面，更新播放按钮
+    if (STATE.currentView === 'player' && STATE.appRefs.playBtn) {
+      STATE.appRefs.playBtn.innerHTML = '';
+      STATE.appRefs.playBtn.appendChild(svg(STATE.isPlaying ? 'pause' : 'play', 22, 'white'));
+      STATE.appRefs.playBtn.style.animation = STATE.isPlaying ? 'shizuku-glow 3s ease-in-out infinite' : 'none';
+    }
   }
 
   function cyclePlayMode() {
@@ -1156,8 +1165,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var idx = modes.indexOf(STATE.playMode);
     STATE.playMode = modes[(idx + 1) % modes.length];
     saveSettings();
-    if (STATE.appRefs.playModeBtn) {
-      updatePlayModeBtn();
+    // 如果在播放器页面，重新渲染以更新模式显示
+    if (STATE.currentView === 'player') {
+      createUI();
     }
   }
 
@@ -1292,11 +1302,27 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   }
 
   function updateProgress() {
-    if (!STATE.appRefs.progressBar || !STATE.duration) return;
+    if (!STATE.audio || !STATE.duration) return;
+
     var pct = (STATE.currentTime / STATE.duration) * 100;
-    STATE.appRefs.progressFill.style.width = pct + '%';
-    STATE.appRefs.currentTimeLabel.textContent = formatTime(STATE.currentTime);
-    STATE.appRefs.durationLabel.textContent = formatTime(STATE.duration);
+
+    // 更新进度条
+    if (STATE.appRefs.progressFill) {
+      STATE.appRefs.progressFill.style.width = pct + '%';
+    }
+
+    // 更新水滴指示点位置
+    if (STATE.appRefs.progressDot) {
+      STATE.appRefs.progressDot.style.left = pct + '%';
+    }
+
+    // 更新时间标签
+    if (STATE.appRefs.currentTimeLabel) {
+      STATE.appRefs.currentTimeLabel.textContent = formatTime(STATE.currentTime);
+    }
+    if (STATE.appRefs.durationLabel) {
+      STATE.appRefs.durationLabel.textContent = formatTime(STATE.duration);
+    }
 
     // 更新当前歌词行
     if (STATE.lyric.length > 0) {
