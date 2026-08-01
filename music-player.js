@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-00:10-v3.5.3-remove-proxy-clean';
+  var BUILD_TIME = '2026-08-02-00:30-v3.6.0-profile-redesign';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1333,112 +1333,159 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     // 内容区
     var content = document.createElement('div');
     content.className = 'shizuku-scrollbar ios-safe-bottom';
-    content.style.cssText = 'flex:1;overflow-y:auto;padding:16px;position:relative;z-index:10';
+    content.style.cssText = 'flex:1;overflow-y:auto;padding-bottom:100px;position:relative;z-index:10';
 
-    // 用户信息卡片
+    // Banner 头图
+    var banner = document.createElement('div');
+    banner.style.cssText = 'position:relative;height:128px;overflow:hidden';
+
+    if (STATE.userProfile.backgroundUrl) {
+      var bgImg = document.createElement('img');
+      bgImg.src = STATE.userProfile.backgroundUrl;
+      bgImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
+      banner.appendChild(bgImg);
+    } else {
+      var bgGradient = document.createElement('div');
+      bgGradient.style.cssText = `position:absolute;inset:0;background:linear-gradient(135deg, ${C.accent}40, ${C.sakura}40, ${C.lavender}40)`;
+      banner.appendChild(bgGradient);
+    }
+
+    var bannerOverlay = document.createElement('div');
+    bannerOverlay.style.cssText = `position:absolute;inset:0;background:linear-gradient(180deg, transparent 0%, ${C.bg}CC 100%)`;
+    banner.appendChild(bannerOverlay);
+    content.appendChild(banner);
+
+    // 用户卡片 - 照抄 SullyOS
     var userCard = document.createElement('div');
-    userCard.className = 'shizuku-glass';
+    userCard.className = 'shizuku-glass-strong';
     userCard.style.cssText = `
-      padding:16px;border-radius:20px;margin-bottom:16px;
-      display:flex;align-items:center;gap:16px;
+      margin:-48px 16px 0 16px;padding:16px;border-radius:24px;position:relative;z-index:10;
+      box-shadow:0 10px 40px ${C.glow}15;
     `;
+
+    var userTop = document.createElement('div');
+    userTop.style.cssText = 'display:flex;align-items:center;gap:12px';
+
+    var avatarBox = document.createElement('div');
+    avatarBox.style.cssText = 'position:relative;flex-shrink:0';
 
     var avatar = document.createElement('img');
-    avatar.src = STATE.userProfile.avatarUrl || '';
-    avatar.style.cssText = `width:60px;height:60px;border-radius:50%;border:2px solid ${C.sakura}`;
+    avatar.src = STATE.userProfile.avatarUrl || 'https://p1.music.126.net/y19E5SadGUmSR8SZxkrNtw==/109951163965029180.jpg';
+    avatar.style.cssText = `width:64px;height:64px;border-radius:16px;object-fit:cover;border:2px solid ${C.glow}60;box-shadow:0 4px 20px ${C.glow}30`;
+    avatarBox.appendChild(avatar);
+
+    var avatarSparkle = sparkle(10, C.sakura, 0.3);
+    avatarSparkle.style.position = 'absolute';
+    avatarSparkle.style.bottom = '-4px';
+    avatarSparkle.style.right = '-4px';
+    avatarBox.appendChild(avatarSparkle);
+
+    userTop.appendChild(avatarBox);
 
     var userInfo = document.createElement('div');
-    userInfo.style.cssText = 'flex:1';
-    userInfo.innerHTML = `
-      <div style="font-size:16px;font-weight:600;color:${C.text};display:flex;align-items:center;gap:6px">
-        ${STATE.userProfile.nickname || '用户'}
-        ${STATE.userProfile.vipType ? '<span style="font-size:10px;background:linear-gradient(135deg, #FFD700, #FFA500);color:white;padding:2px 6px;border-radius:4px">VIP</span>' : ''}
-      </div>
-      <div style="font-size:11px;color:${C.muted};margin-top:4px">${STATE.userProfile.signature || '这个人很懒，什么都没写'}</div>
-      <div style="font-size:10px;color:${C.faint};margin-top:6px;display:flex;gap:12px">
-        <span>歌单 ${STATE.userPlaylists.length}</span>
-        <span>关注 ${STATE.userProfile.follows || 0}</span>
-        <span>粉丝 ${STATE.userProfile.followeds || 0}</span>
-      </div>
-    `;
+    userInfo.style.cssText = 'flex:1;min-width:0';
 
-    userCard.appendChild(avatar);
-    userCard.appendChild(userInfo);
+    var userName = document.createElement('div');
+    userName.textContent = STATE.userProfile.nickname || '用户';
+    userName.style.cssText = `font-size:16px;font-weight:600;color:${C.text};font-family:'Noto Serif',serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+    userInfo.appendChild(userName);
+
+    var userSig = document.createElement('div');
+    userSig.textContent = STATE.userProfile.signature || '—';
+    userSig.style.cssText = `font-size:10px;color:${C.muted};margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap`;
+    userInfo.appendChild(userSig);
+
+    var userBadges = document.createElement('div');
+    userBadges.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px';
+
+    var vipLabel = STATE.userProfile.vipType ? (STATE.userProfile.vipType === 11 ? 'SVIP' : 'VIP') : '普通用户';
+    var vipBadge = document.createElement('span');
+    vipBadge.textContent = vipLabel;
+    vipBadge.style.cssText = `font-size:9px;padding:2px 8px;border-radius:20px;color:white;font-weight:600;background:linear-gradient(135deg, ${C.vip}, #e0b88a);letter-spacing:0.05em`;
+    userBadges.appendChild(vipBadge);
+
+    var uidBadge = document.createElement('span');
+    uidBadge.textContent = 'UID · ' + STATE.userProfile.userId;
+    uidBadge.style.cssText = `font-size:9px;padding:2px 8px;border-radius:20px;color:${C.muted};border:1px solid ${C.faint}40`;
+    userBadges.appendChild(uidBadge);
+
+    userInfo.appendChild(userBadges);
+    userTop.appendChild(userInfo);
+    userCard.appendChild(userTop);
+
+    // 统计行
+    var stats = document.createElement('div');
+    stats.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;text-align:center';
+
+    function createStatCell(label, value) {
+      var cell = document.createElement('div');
+      cell.className = 'shizuku-glass';
+      cell.style.cssText = 'padding:8px;border-radius:12px';
+      cell.innerHTML = `
+        <div style="font-size:16px;font-weight:600;color:${C.primary}">${value}</div>
+        <div style="font-size:9px;color:${C.muted};margin-top:2px">${label}</div>
+      `;
+      return cell;
+    }
+
+    stats.appendChild(createStatCell('歌单', STATE.userPlaylists.length));
+    stats.appendChild(createStatCell('关注', STATE.userProfile.follows || 0));
+    stats.appendChild(createStatCell('粉丝', STATE.userProfile.followeds || 0));
+    userCard.appendChild(stats);
+
+    // 快捷按钮行
+    var quickBtns = document.createElement('div');
+    quickBtns.style.cssText = 'display:flex;gap:8px;margin-top:12px';
+
+    var signBtn = document.createElement('button');
+    signBtn.textContent = STATE.signedIn ? '已签到 ✓' : '每日签到';
+    signBtn.className = 'shizuku-glass shizuku-btn-hover';
+    signBtn.style.cssText = `flex:1;padding:8px;border-radius:12px;border:1px solid ${STATE.signedIn ? C.faint : C.primary}30;font-size:11px;color:${STATE.signedIn ? C.muted : C.primary};cursor:pointer;transition:all 0.2s`;
+    signBtn.onclick = function() {
+      if (!STATE.signedIn) doSignIn();
+    };
+    quickBtns.appendChild(signBtn);
+
+    var logoutBtn = document.createElement('button');
+    logoutBtn.textContent = '退出登录';
+    logoutBtn.className = 'shizuku-glass shizuku-btn-hover';
+    logoutBtn.style.cssText = `flex:1;padding:8px;border-radius:12px;border:1px solid ${C.faint}30;font-size:11px;color:${C.muted};cursor:pointer;transition:all 0.2s`;
+    logoutBtn.onclick = logout;
+    quickBtns.appendChild(logoutBtn);
+
+    userCard.appendChild(quickBtns);
     content.appendChild(userCard);
 
-    // 快捷按钮
-    var quickBtns = document.createElement('div');
-    quickBtns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px';
+    // 功能卡片网格
+    var funcGrid = document.createElement('div');
+    funcGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px;';
 
-    // 签到按钮
-    var signBtn = createQuickBtn(STATE.signedIn ? '✅' : '📅', STATE.signedIn ? '已签到' : '签到', function() {
-      if (STATE.signedIn) return;
-      doSignIn();
-    });
+    function createFuncCard(emoji, title, subtitle, onclick) {
+      var card = document.createElement('button');
+      card.className = 'shizuku-glass shizuku-btn-hover';
+      card.style.cssText = `padding:16px;border-radius:16px;border:none;cursor:pointer;text-align:left;transition:all 0.2s`;
+      card.onclick = onclick;
+      card.innerHTML = `
+        <div style="font-size:24px;margin-bottom:8px">${emoji}</div>
+        <div style="font-size:13px;color:${C.text};font-weight:500">${title}</div>
+        <div style="font-size:10px;color:${C.muted};margin-top:4px">${subtitle}</div>
+      `;
+      return card;
+    }
 
-    var btn1 = createQuickBtn('🎵', '每日推荐', function() {
-      loadDailyRecommend();
-    });
-    var btn2 = createQuickBtn('📻', '私人FM', function() {
-      loadPersonalFm();
-    });
-    var btn3 = createQuickBtn('💿', '我的歌单', function() {
+    funcGrid.appendChild(createFuncCard('🎵', '每日推荐', '为你精选30首', loadDailyRecommend));
+    funcGrid.appendChild(createFuncCard('📻', '私人FM', '不重样的惊喜', loadPersonalFm));
+    funcGrid.appendChild(createFuncCard('💿', '我的歌单', STATE.userPlaylists.length + ' 个歌单', function() {
       STATE.currentView = 'playlist';
       createUI();
-    });
-    var btn4 = createQuickBtn('🕐', '播放记录', function() {
-      loadPlayRecord();
-    });
-    var btn5 = createQuickBtn('🚪', '退出登录', logout);
+    }));
+    funcGrid.appendChild(createFuncCard('🕐', '播放记录', '最近听过的歌', loadPlayRecord));
 
-    quickBtns.appendChild(signBtn);
-    quickBtns.appendChild(btn1);
-    quickBtns.appendChild(btn2);
-    quickBtns.appendChild(btn3);
-    quickBtns.appendChild(btn4);
-    quickBtns.appendChild(btn5);
-    content.appendChild(quickBtns);
+    content.appendChild(funcGrid);
 
     container.appendChild(content);
     STATE.appContainer.innerHTML = '';
     STATE.appContainer.appendChild(container);
-  }
-
-  function createQuickBtn(emoji, text, onclick) {
-    var btn = document.createElement('button');
-    btn.className = 'shizuku-glass shizuku-btn-hover';
-    btn.style.cssText = `
-      padding:16px 12px;border-radius:16px;border:none;cursor:pointer;
-      display:flex;flex-direction:column;align-items:center;gap:8px;
-      transition:all 0.2s;position:relative;overflow:hidden;
-    `;
-    btn.onclick = onclick;
-
-    // 背景扫光效果
-    var shimmer = document.createElement('div');
-    shimmer.style.cssText = `
-      position:absolute;inset:0;opacity:0;transition:opacity 0.3s;
-      background:linear-gradient(135deg, transparent, rgba(255,255,255,0.2), transparent);
-      background-size:200% 200%;
-    `;
-    btn.appendChild(shimmer);
-
-    btn.onmouseenter = function() {
-      shimmer.style.opacity = '1';
-    };
-    btn.onmouseleave = function() {
-      shimmer.style.opacity = '0';
-    };
-
-    var content = document.createElement('div');
-    content.style.cssText = 'position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;gap:8px';
-    content.innerHTML = `
-      <div style="font-size:24px">${emoji}</div>
-      <div style="font-size:11px;color:${C.primary};letter-spacing:0.05em">${text}</div>
-    `;
-    btn.appendChild(content);
-
-    return btn;
   }
 
   // ==================== 搜索页面 UI ====================
@@ -2312,7 +2359,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.5.3',
+      version: '3.6.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
