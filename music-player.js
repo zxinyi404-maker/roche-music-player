@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-09:00-v3.17.0-dynamic-island';
+  var BUILD_TIME = '2026-08-02-09:30-v3.17.1-improve-island';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -1343,23 +1343,82 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   function updateLyricDisplay() {
     if (!STATE.appRefs.lyricContainer) return;
-    var container = STATE.appRefs.lyricContainer;
 
-    // 高亮当前行
-    var lines = container.querySelectorAll('.lyric-line');
-    for (var i = 0; i < lines.length; i++) {
-      if (i === STATE.activeLyricIdx) {
-        lines[i].style.color = C.primary;
-        lines[i].style.fontWeight = '600';
-        lines[i].style.transform = 'scale(1.05)';
-        // 滚动到当前行
-        lines[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        lines[i].style.color = C.muted;
-        lines[i].style.fontWeight = '400';
-        lines[i].style.transform = 'scale(1)';
-      }
+    // 完全重新渲染歌词列表，以应用新的样式和星芒装饰
+    var container = STATE.appRefs.lyricContainer;
+    container.innerHTML = '';
+
+    if (STATE.lyric.length === 0) {
+      var emptyLyric = document.createElement('div');
+      emptyLyric.style.cssText = `padding:40px 0;color:${C.faint}`;
+
+      var sparkleDecor = sparkle(24, C.glow, 0);
+      sparkleDecor.style.display = 'block';
+      sparkleDecor.style.margin = '0 auto 12px';
+      emptyLyric.appendChild(sparkleDecor);
+
+      var emptyText = document.createElement('div');
+      emptyText.textContent = '暂无歌词';
+      emptyText.style.cssText = `font-size:11px;font-style:italic;font-family:'Georgia',serif`;
+      emptyLyric.appendChild(emptyText);
+
+      container.appendChild(emptyLyric);
+      return;
     }
+
+    // 重新创建所有歌词行
+    STATE.lyric.forEach(function(line, idx) {
+      var lyricLine = document.createElement('div');
+      lyricLine.className = 'lyric-line';
+      lyricLine.textContent = line.text;
+      var isActive = idx === STATE.activeLyricIdx;
+
+      lyricLine.style.cssText = `
+        padding:12px 16px;font-size:${isActive ? '15px' : '13px'};
+        line-height:1.6;transition:all 0.3s ease;
+        cursor:pointer;position:relative;
+        font-weight:${isActive ? '500' : '400'};
+      `;
+
+      // 当前行使用渐变文字 + 发光
+      if (isActive) {
+        lyricLine.style.background = `linear-gradient(135deg, ${C.primary}, ${C.glow})`;
+        lyricLine.style.webkitBackgroundClip = 'text';
+        lyricLine.style.webkitTextFillColor = 'transparent';
+        lyricLine.style.backgroundClip = 'text';
+        lyricLine.style.filter = `drop-shadow(0 0 8px ${C.glow}60)`;
+        lyricLine.style.transform = 'scale(1.05)';
+
+        // 左侧星芒
+        var leftStar = sparkle(6, C.sakura, 0);
+        leftStar.style.position = 'absolute';
+        leftStar.style.left = '8px';
+        leftStar.style.top = '50%';
+        leftStar.style.transform = 'translateY(-50%)';
+        lyricLine.appendChild(leftStar);
+
+        // 右侧星芒
+        var rightStar = sparkle(6, C.sakura, 0.5);
+        rightStar.style.position = 'absolute';
+        rightStar.style.right = '8px';
+        rightStar.style.top = '50%';
+        rightStar.style.transform = 'translateY(-50%)';
+        lyricLine.appendChild(rightStar);
+
+        // 滚动到当前行（居中）
+        setTimeout(function() {
+          lyricLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+      } else {
+        lyricLine.style.color = C.muted;
+      }
+
+      lyricLine.onclick = function() {
+        if (STATE.audio) STATE.audio.currentTime = line.t;
+      };
+
+      container.appendChild(lyricLine);
+    });
   }
 
   // ==================== 搜索功能 ====================
@@ -3311,6 +3370,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
   // ==================== 全局灵动岛 MiniPlayer ====================
   var GLOBAL_ISLAND = null;
+  var ISLAND_EXPANDED = false;
 
   function createGlobalIsland() {
     // 如果已存在，先移除
@@ -3321,38 +3381,39 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     if (!STATE.currentSong) return;
 
-    // 创建灵动岛容器
+    // 创建灵动岛容器（紧凑模式）
     GLOBAL_ISLAND = document.createElement('div');
     GLOBAL_ISLAND.id = 'roche-music-island';
+    GLOBAL_ISLAND.className = 'ios-safe-top';
     GLOBAL_ISLAND.style.cssText = `
-      position:fixed;top:12px;left:50%;transform:translateX(-50%);
+      position:fixed;top:8px;left:50%;transform:translateX(-50%);
       z-index:999999;
       background:rgba(20,20,25,0.95);
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      border-radius:24px;padding:8px 16px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
-      display:flex;align-items:center;gap:12px;
-      cursor:pointer;transition:all 0.3s;
-      max-width:420px;
+      border-radius:20px;padding:6px 12px;
+      box-shadow:0 6px 24px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.1);
+      display:flex;align-items:center;gap:10px;
+      cursor:pointer;transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      max-width:280px;
     `;
 
-    // 封面
+    // 封面（更小）
     var cover = document.createElement('img');
     cover.src = STATE.currentSong.pic || STATE.currentSong.albumPic;
     cover.style.cssText = `
-      width:36px;height:36px;border-radius:8px;object-fit:cover;
+      width:28px;height:28px;border-radius:6px;object-fit:cover;
       flex-shrink:0;
     `;
     GLOBAL_ISLAND.appendChild(cover);
 
-    // 信息区域（可展开显示歌词）
+    // 信息区域
     var infoBox = document.createElement('div');
-    infoBox.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px';
+    infoBox.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:1px';
 
     var songName = document.createElement('div');
     songName.textContent = STATE.currentSong.name;
     songName.style.cssText = `
-      font-size:12px;font-weight:500;color:white;
+      font-size:11px;font-weight:500;color:white;
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     `;
     infoBox.appendChild(songName);
@@ -3361,7 +3422,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     var lyricText = document.createElement('div');
     lyricText.id = 'island-lyric';
     lyricText.style.cssText = `
-      font-size:10px;color:rgba(255,255,255,0.6);
+      font-size:9px;color:rgba(255,255,255,0.5);
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
       font-style:italic;
     `;
@@ -3370,71 +3431,75 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     GLOBAL_ISLAND.appendChild(infoBox);
 
-    // 控制按钮
-    var controls = document.createElement('div');
-    controls.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0';
-
-    // 上一曲
-    var prevBtn = document.createElement('button');
-    prevBtn.style.cssText = `
-      width:28px;height:28px;border-radius:50%;border:none;
-      background:rgba(255,255,255,0.1);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      transition:all 0.2s;
-    `;
-    prevBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 256 256" fill="white"><path d="M224,114,96,34A8,8,0,0,0,84,40V216a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14ZM40,40V216a8,8,0,0,1-16,0V40a8,8,0,0,1,16,0Z"/></svg>`;
-    prevBtn.onclick = function(e) {
-      e.stopPropagation();
-      playPrev();
-      updateIslandInfo();
-    };
-    controls.appendChild(prevBtn);
-
-    // 播放/暂停
+    // 播放/暂停按钮（始终显示）
     var playBtn = document.createElement('button');
     playBtn.id = 'island-play-btn';
     playBtn.style.cssText = `
-      width:32px;height:32px;border-radius:50%;border:none;
+      width:28px;height:28px;border-radius:50%;border:none;
       background:white;cursor:pointer;
       display:flex;align-items:center;justify-content:center;
-      transition:all 0.2s;
+      transition:all 0.2s;flex-shrink:0;
     `;
     var playIcon = STATE.isPlaying ?
-      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>' :
-      '<svg width="14" height="14" viewBox="0 0 256 256" fill="black"><path d="M232,114.5,88,26.5A8,8,0,0,0,76,33V223a8,8,0,0,0,12,6.5l144-88a8,8,0,0,0,0-13Z"/></svg>';
+      '<svg width="12" height="12" viewBox="0 0 256 256" fill="black"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>' :
+      '<svg width="12" height="12" viewBox="0 0 256 256" fill="black"><path d="M232,114.5,88,26.5A8,8,0,0,0,76,33V223a8,8,0,0,0,12,6.5l144-88a8,8,0,0,0,0-13Z"/></svg>';
     playBtn.innerHTML = playIcon;
     playBtn.onclick = function(e) {
       e.stopPropagation();
       togglePlay();
       setTimeout(updateIslandPlayBtn, 100);
     };
-    controls.appendChild(playBtn);
+    GLOBAL_ISLAND.appendChild(playBtn);
+
+    // 扩展控制区域（默认隐藏）
+    var expandedControls = document.createElement('div');
+    expandedControls.id = 'island-expanded-controls';
+    expandedControls.style.cssText = `
+      display:none;align-items:center;gap:6px;flex-shrink:0;
+      opacity:0;transition:opacity 0.2s;
+    `;
+
+    // 上一曲
+    var prevBtn = document.createElement('button');
+    prevBtn.style.cssText = `
+      width:24px;height:24px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.15);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:all 0.2s;
+    `;
+    prevBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 256 256" fill="white"><path d="M224,114,96,34A8,8,0,0,0,84,40V216a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14ZM40,40V216a8,8,0,0,1-16,0V40a8,8,0,0,1,16,0Z"/></svg>`;
+    prevBtn.onclick = function(e) {
+      e.stopPropagation();
+      playPrev();
+      updateIslandInfo();
+    };
+    expandedControls.appendChild(prevBtn);
 
     // 下一曲
     var nextBtn = document.createElement('button');
     nextBtn.style.cssText = `
-      width:28px;height:28px;border-radius:50%;border:none;
-      background:rgba(255,255,255,0.1);cursor:pointer;
+      width:24px;height:24px;border-radius:50%;border:none;
+      background:rgba(255,255,255,0.15);cursor:pointer;
       display:flex;align-items:center;justify-content:center;
       transition:all 0.2s;
     `;
-    nextBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 256 256" fill="white"><path d="M200,32a8,8,0,0,0-8,8V216a8,8,0,0,0,16,0V40A8,8,0,0,0,200,32Zm-36,86-128-80A8,8,0,0,0,24,46v165a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14Z"/></svg>`;
+    nextBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 256 256" fill="white"><path d="M200,32a8,8,0,0,0-8,8V216a8,8,0,0,0,16,0V40A8,8,0,0,0,200,32Zm-36,86-128-80A8,8,0,0,0,24,46v165a8,8,0,0,0,13,6l128-80a8,8,0,0,0,0-14Z"/></svg>`;
     nextBtn.onclick = function(e) {
       e.stopPropagation();
       playNext();
       updateIslandInfo();
     };
-    controls.appendChild(nextBtn);
+    expandedControls.appendChild(nextBtn);
 
     // 关闭按钮
     var closeBtn = document.createElement('button');
     closeBtn.style.cssText = `
       width:24px;height:24px;border-radius:50%;border:none;
-      background:rgba(255,255,255,0.1);cursor:pointer;
+      background:rgba(255,255,255,0.15);cursor:pointer;
       display:flex;align-items:center;justify-content:center;
-      transition:all 0.2s;margin-left:4px;
+      transition:all 0.2s;
     `;
-    closeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 256 256" fill="white"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>`;
+    closeBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 256 256" fill="white"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>`;
     closeBtn.onclick = function(e) {
       e.stopPropagation();
       if (STATE.audio) {
@@ -3442,9 +3507,9 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       }
       removeGlobalIsland();
     };
-    controls.appendChild(closeBtn);
+    expandedControls.appendChild(closeBtn);
 
-    GLOBAL_ISLAND.appendChild(controls);
+    GLOBAL_ISLAND.appendChild(expandedControls);
 
     // 点击灵动岛重新打开音乐插件
     GLOBAL_ISLAND.onclick = function() {
@@ -3453,14 +3518,32 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       }
     };
 
-    // Hover 效果
+    // Hover 展开控制按钮
     GLOBAL_ISLAND.onmouseenter = function() {
+      ISLAND_EXPANDED = true;
       this.style.transform = 'translateX(-50%) scale(1.02)';
-      this.style.boxShadow = '0 12px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.15)';
+      this.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4), 0 0 0 0.5px rgba(255,255,255,0.15)';
+      this.style.maxWidth = '380px';
+      var controls = document.getElementById('island-expanded-controls');
+      if (controls) {
+        controls.style.display = 'flex';
+        setTimeout(function() {
+          controls.style.opacity = '1';
+        }, 10);
+      }
     };
     GLOBAL_ISLAND.onmouseleave = function() {
+      ISLAND_EXPANDED = false;
       this.style.transform = 'translateX(-50%) scale(1)';
-      this.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)';
+      this.style.boxShadow = '0 6px 24px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.1)';
+      this.style.maxWidth = '280px';
+      var controls = document.getElementById('island-expanded-controls');
+      if (controls) {
+        controls.style.opacity = '0';
+        setTimeout(function() {
+          controls.style.display = 'none';
+        }, 200);
+      }
     };
 
     document.body.appendChild(GLOBAL_ISLAND);
