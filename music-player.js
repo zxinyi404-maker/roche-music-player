@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-02:30-v3.9.0-full-features';
+  var BUILD_TIME = '2026-08-02-02:40-v3.9.1-like-feature';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -294,14 +294,58 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       if (data && data.data && data.data.profile) {
         STATE.userProfile = data.data.profile;
         saveSettings();
-        // 登录成功后自动加载歌单
+        // 登录成功后自动加载歌单和喜欢列表
         loadUserPlaylists();
+        loadLikedSongs();
         return data.data.profile;
       }
       return null;
     }).catch(function(e) {
       console.error('[获取用户信息失败]', e);
       return null;
+    });
+  }
+
+  // 加载喜欢列表
+  function loadLikedSongs() {
+    if (!STATE.cookie) return;
+    neteaseCall('/likelist', {}).then(function(data) {
+      var ids = (data.ids || data.data && data.data.ids) || [];
+      STATE.likedSongs = ids;
+      console.log('[喜欢列表]', ids.length + ' 首');
+    }).catch(function(e) {
+      console.error('[获取喜欢列表失败]', e);
+    });
+  }
+
+  // 切换喜欢状态
+  function toggleLike(songId) {
+    if (!STATE.cookie) {
+      alert('请先登录');
+      return Promise.reject(new Error('未登录'));
+    }
+    var isLiked = STATE.likedSongs.indexOf(songId) >= 0;
+    var willLike = !isLiked;
+
+    return neteaseCall('/like', { id: songId, like: willLike }).then(function(data) {
+      if (willLike) {
+        if (STATE.likedSongs.indexOf(songId) < 0) {
+          STATE.likedSongs.push(songId);
+        }
+        console.log('[已喜欢]', songId);
+      } else {
+        STATE.likedSongs = STATE.likedSongs.filter(function(id) { return id !== songId; });
+        console.log('[取消喜欢]', songId);
+      }
+      // 刷新播放器界面
+      if (STATE.currentView === 'player') {
+        createUI();
+      }
+      return willLike;
+    }).catch(function(e) {
+      console.error('[切换喜欢失败]', e);
+      alert('操作失败：' + e.message);
+      throw e;
     });
   }
 
@@ -2828,7 +2872,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.9.0',
+      version: '3.9.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
