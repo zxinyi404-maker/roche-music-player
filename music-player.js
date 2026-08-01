@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-04:20-v3.13.0-data-sync';
+  var BUILD_TIME = '2026-08-02-05:30-v3.13.2-fix-cloud-api';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -315,7 +315,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     Promise.allSettled([
       neteaseUserPlaylist(STATE.userProfile.userId),
       neteaseRecordRecentSong(STATE.userProfile.userId),
-      neteaseUserCloud(),
+      neteaseCall('/user/cloud', { limit: 200 }),
       neteaseCall('/likelist', {})
     ]).then(function(results) {
       console.log('[Promise.allSettled 完成]', results);
@@ -3009,7 +3009,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.13.0',
+      version: '3.13.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
