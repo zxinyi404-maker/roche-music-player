@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.17.1",
-  "description": "✨ 优化灵动岛：更紧凑、Hover 展开控制、修复歌词滚动",
+  "version": "3.17.2",
+  "description": "🍎 适配 iPhone X 刘海屏：灵动岛下移至安全区域",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
