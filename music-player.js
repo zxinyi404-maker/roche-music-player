@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-10:00-v3.17.3-fix-safe-area';
+  var BUILD_TIME = '2026-08-02-10:15-v3.17.4-fix-captcha';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -913,7 +913,11 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
         alert('请输入11位手机号');
         return;
       }
+      sendBtn.disabled = true;
+      sendBtn.textContent = '发送中...';
+
       captchaSent(loginState.phone).then(function(r) {
+        console.log('[验证码响应]', r);
         if (r.code === 200 || r.data === true) {
           alert('验证码已发送');
           loginState.cooldown = 60;
@@ -927,8 +931,15 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
             }
           }, 1000);
         } else {
-          alert(r.message || '发送失败');
+          alert(r.message || '发送失败，请重试');
+          sendBtn.textContent = '获取验证码';
+          sendBtn.disabled = false;
         }
+      }).catch(function(err) {
+        console.error('[验证码发送失败]', err);
+        alert('网络错误，请重试');
+        sendBtn.textContent = '获取验证码';
+        sendBtn.disabled = false;
       });
     };
 

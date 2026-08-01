@@ -1,8 +1,8 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.17.3",
-  "description": "🍎 使用 env(safe-area-inset-top) 正确适配刘海屏",
+  "version": "3.17.4",
+  "description": "🔧 修复验证码发送：添加错误处理和状态提示",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
   "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js",
