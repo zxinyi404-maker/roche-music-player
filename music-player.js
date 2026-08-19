@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.22.0-char-dj';
+  var BUILD_TIME = '2026-08-19-v3.22.1-audio-unlock';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -515,26 +515,64 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     STATE.audioUnlocking = true;
     var audio = STATE.audio;
     var previousMuted = audio.muted;
-    audio.muted = true;
-    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+    var context = null;
+    var contextUnlocked = false;
+    var silentWav = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
-    audioUnlockPromise = Promise.resolve(audio.play()).then(function() {
-      audio.pause();
-      audio.currentTime = 0;
+    // 同时唤醒 Web Audio 和 HTMLAudio，兼容桌面浏览器及 iOS WebKit。
+    var contextPromise = Promise.resolve().then(function() {
+      var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return false;
+      context = STATE.audioContext || new AudioContextCtor();
+      STATE.audioContext = context;
+      return context.resume().then(function() {
+        contextUnlocked = true;
+        var oscillator = context.createOscillator();
+        var gain = context.createGain();
+        gain.gain.value = 0.00001;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.02);
+        return true;
+      });
+    }).catch(function(error) {
+      console.warn('[一起听] Web Audio 解锁失败，继续尝试 HTMLAudio', error);
+      return false;
+    });
+
+    var audioPromise = Promise.resolve().then(function() {
+      audio.muted = true;
+      audio.src = silentWav;
+      audio.load();
+      return audio.play().then(function() {
+        audio.pause();
+        audio.muted = previousMuted;
+        return true;
+      });
+    }).catch(function(error) {
       audio.muted = previousMuted;
+      if (contextUnlocked) return true;
+      throw error;
+    });
+
+    audioUnlockPromise = Promise.all([contextPromise, audioPromise.catch(function(error) {
+      console.warn('[一起听] HTMLAudio 解锁失败', error);
+      return false;
+    })]).then(function(results) {
+      if (!results[0] && !results[1]) throw new Error('浏览器没有放行音频');
       STATE.audioUnlocked = true;
       STATE.audioUnlocking = false;
       return true;
     }).catch(function(error) {
-      audio.muted = previousMuted;
       STATE.audioUnlocking = false;
       STATE.audioUnlocked = false;
       console.error('[一起听] 音频授权失败', error);
-      throw new Error('音频授权失败，请再点一次开始按钮');
+      var detail = error && error.name ? '（' + error.name + '）' : '';
+      throw new Error('浏览器没有放行音频' + detail + '。请在插件内先点击一次播放按钮，再点击开始一起听');
     });
     return audioUnlockPromise;
   }
-
   function extractDjChoice(result) {
     var text = result && (result.text || result.message || result.content) || '';
     if (typeof text !== 'string') text = String(text || '');
@@ -4366,7 +4404,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.22.0',
+      version: '3.22.1',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
