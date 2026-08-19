@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.23.2-chat-context';
+  var BUILD_TIME = '2026-08-19-v3.23.3-character-ownership';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -4404,7 +4404,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.23.2',
+      version: '3.23.3',
       icon: '🎵',
       // 只注入当前听歌状态，不注册工具、不额外请求模型。
       chat: {
@@ -4439,11 +4439,12 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           return [
             '【重要：当前一起听状态】',
             '这是当前聊天的实时背景：你和用户正在一起听歌，不是插件界面里的独立对话。',
-            '当前由 ' + characterName + ' 选择：' + song.name + ' - ' + (song.artist || song.artists || '未知歌手'),
+            '这是你刚才亲自做出的动作：你作为 ' + characterName + '，已经为用户选中并让播放器开始播放「' + song.name + '」- ' + (song.artist || song.artists || '未知歌手') + '。',
+            '请将这首歌视为“我刚刚选来和你一起听的歌”，不要说成是用户自己随机播放或插件替你选择。',
             '播放状态：' + status + '（' + progress + '）',
             lyricContext,
-            STATE.togetherMessage ? '刚才的听歌互动：' + STATE.togetherMessage : '',
-            '请把这当作当前对话背景，自然地提到正在听的歌或歌词；不要声称自己能听到设备音频，也不要复述整首歌词。'
+            STATE.togetherMessage ? '你当时对用户说的话：' + STATE.togetherMessage : '',
+            '请把这当作当前对话背景，自然地以第一人称谈起这首歌或此刻歌词；不要声称自己能听到设备音频，也不要复述整首歌词。'
           ].filter(Boolean).join('\n');
         }
       },
