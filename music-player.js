@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.22.1-audio-unlock';
+  var BUILD_TIME = '2026-08-19-v3.23.1-lyric-context';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -4404,7 +4404,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.23.0',
+      version: '3.23.1',
       icon: '🎵',
       // 只注入当前听歌状态，不注册工具、不额外请求模型。
       chat: {
@@ -4423,13 +4423,30 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           var song = STATE.currentSong;
           var status = STATE.isPlaying ? '正在播放' : '已暂停';
           var progress = STATE.duration ? formatTime(STATE.currentTime) + ' / ' + formatTime(STATE.duration) : formatTime(STATE.currentTime);
+          var lyricIndex = -1;
+          for (var i = 0; i < STATE.lyric.length; i++) {
+            if (STATE.lyric[i].t <= STATE.currentTime) lyricIndex = i;
+            else break;
+          }
+          var lyricWindow = [];
+          if (lyricIndex >= 0) {
+            for (var lyricOffset = -1; lyricOffset <= 1; lyricOffset++) {
+              var lyricItem = STATE.lyric[lyricIndex + lyricOffset];
+              if (!lyricItem) continue;
+              lyricWindow.push((lyricOffset === 0 ? '当前：' : lyricOffset < 0 ? '上一句：' : '下一句：') + String(lyricItem.text || '').slice(0, 120));
+            }
+          }
+          var lyricContext = lyricWindow.length > 0
+            ? '此刻歌词：\n' + lyricWindow.join('\n')
+            : '此刻歌词：暂无可用歌词';
           return [
             '【一起听状态】',
             '你和用户正在通过网易云音乐插件一起听歌。',
             '当前由 ' + characterName + ' 选择：' + song.name + ' - ' + (song.artist || song.artists || '未知歌手'),
             '播放状态：' + status + '（' + progress + '）',
+            lyricContext,
             STATE.togetherMessage ? '刚才的听歌互动：' + STATE.togetherMessage : '',
-            '请自然地记住这首歌并围绕它回应，不要声称自己能听到设备音频。'
+            '请自然地记住这首歌和此刻歌词并围绕它回应，不要声称自己能听到设备音频，也不要复述整首歌词。'
           ].filter(Boolean).join('\n');
         }
       },
