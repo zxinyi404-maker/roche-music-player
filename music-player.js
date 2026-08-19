@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.23.1-lyric-context';
+  var BUILD_TIME = '2026-08-19-v3.23.2-chat-context';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -4404,7 +4404,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.23.1',
+      version: '3.23.2',
       icon: '🎵',
       // 只注入当前听歌状态，不注册工具、不额外请求模型。
       chat: {
@@ -4414,11 +4414,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           var selectedCharacter = STATE.togetherCharacters.find(function(character) {
             return String(character.id) === String(STATE.togetherCharacterId);
           });
-          if (selectedCharacter && selectedCharacter.conversationId && ctx && ctx.conversationId &&
-              String(selectedCharacter.conversationId) !== String(ctx.conversationId)) {
-            return null;
-          }
-
+          // 主聊天的 conversationId 可能与角色资料里的会话 ID 不同，不能用它过滤。
+          // 一起听开启后，状态应注入当前用户正在发送消息的这条聊天。
           var characterName = getCharacterDisplayName(selectedCharacter);
           var song = STATE.currentSong;
           var status = STATE.isPlaying ? '正在播放' : '已暂停';
@@ -4440,13 +4437,13 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
             ? '此刻歌词：\n' + lyricWindow.join('\n')
             : '此刻歌词：暂无可用歌词';
           return [
-            '【一起听状态】',
-            '你和用户正在通过网易云音乐插件一起听歌。',
+            '【重要：当前一起听状态】',
+            '这是当前聊天的实时背景：你和用户正在一起听歌，不是插件界面里的独立对话。',
             '当前由 ' + characterName + ' 选择：' + song.name + ' - ' + (song.artist || song.artists || '未知歌手'),
             '播放状态：' + status + '（' + progress + '）',
             lyricContext,
             STATE.togetherMessage ? '刚才的听歌互动：' + STATE.togetherMessage : '',
-            '请自然地记住这首歌和此刻歌词并围绕它回应，不要声称自己能听到设备音频，也不要复述整首歌词。'
+            '请把这当作当前对话背景，自然地提到正在听的歌或歌词；不要声称自己能听到设备音频，也不要复述整首歌词。'
           ].filter(Boolean).join('\n');
         }
       },
