@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-02-12:15-v3.21.0-persist-all';
+  var BUILD_TIME = '2026-08-19-v3.22.0-char-dj';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -55,6 +55,19 @@
     expandedPlaylistId: null,
     signedIn: false,
     currentTab: 'playlist', // 'playlist' | 'record' | 'cloud'
+    // 和 Char 一起听（仅插件前台会话，不接入主聊天工具链）
+    togetherEnabled: false,
+    togetherCharacterId: '',
+    togetherAutoContinue: true,
+    togetherCharacters: [],
+    togetherCharactersLoaded: false,
+    togetherCharactersLoading: false,
+    togetherChoosing: false,
+    togetherRequestId: 0,
+    togetherStatus: 'idle',
+    togetherMessage: '',
+    audioUnlocked: false,
+    audioUnlocking: false,
     // 登录面板状态（持久化）
     loginState: {
       mode: 'qr',
@@ -255,6 +268,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
               STATE.backend = parsed.backend || 'https://sullymeow.ccwu.cc';
               STATE.islandTopOffset = parsed.islandTopOffset || 50;
               STATE.playMode = parsed.playMode || 'loop';
+              STATE.togetherCharacterId = parsed.togetherCharacterId || '';
+              STATE.togetherAutoContinue = parsed.togetherAutoContinue !== false;
               // 恢复播放状态
               STATE.currentSong = parsed.currentSong || null;
               STATE.playlist = parsed.playlist || [];
@@ -294,6 +309,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.backend = data.backend || 'https://sullymeow.ccwu.cc';
       STATE.islandTopOffset = data.islandTopOffset || 50;
       STATE.playMode = data.playMode || 'loop';
+      STATE.togetherCharacterId = data.togetherCharacterId || '';
+      STATE.togetherAutoContinue = data.togetherAutoContinue !== false;
       // 恢复播放状态
       STATE.currentSong = data.currentSong || null;
       STATE.playlist = data.playlist || [];
@@ -318,6 +335,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       backend: STATE.backend,
       islandTopOffset: STATE.islandTopOffset,
       playMode: STATE.playMode,
+      togetherCharacterId: STATE.togetherCharacterId,
+      togetherAutoContinue: STATE.togetherAutoContinue,
       // 播放状态
       currentSong: STATE.currentSong,
       playlist: STATE.playlist,
@@ -384,6 +403,317 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   function neteaseRecordRecentSong(uid) { return neteaseCall('/record/recent/song', { uid }); }
   function neteaseUserRecord(uid, type) { return neteaseCall('/user/record', { uid, type: type || 1 }); }
 
+  // ==================== 和 Char 一起听 ====================
+  var audioUnlockPromise = null;
+
+  function showToast(message) {
+    if (STATE.roche && STATE.roche.ui && STATE.roche.ui.toast) {
+      STATE.roche.ui.toast(message);
+    } else {
+      alert(message);
+    }
+  }
+
+  function refreshTogetherView() {
+    if (STATE.currentView === 'profile' && STATE.appContainer && STATE.appContainer.isConnected) {
+      createUI();
+    }
+  }
+
+  function getCharacterDisplayName(character) {
+    return character ? (character.handle || character.displayName || character.name || 'TA') : 'TA';
+  }
+
+  function normalizeSearchSongs(response) {
+    var result = response && (response.result || response);
+    var songs = result && Array.isArray(result.songs) ? result.songs : [];
+    return songs.map(function(song) {
+      var artists = song.ar || song.artists || [];
+      var album = song.al || song.album || {};
+      return {
+        id: song.id,
+        name: song.name || '',
+        artist: artists.map(function(artist) { return artist.name; }).join(' / '),
+        artists: artists.map(function(artist) { return artist.name; }).join(' / '),
+        album: album.name || '',
+        pic: toHttps(album.picUrl || ''),
+        albumPic: toHttps(album.picUrl || ''),
+        duration: song.dt || song.duration || 0,
+        fee: song.fee || 0
+      };
+    }).filter(function(song) {
+      return song.id && song.name;
+    });
+  }
+
+  function loadTogetherCharacters() {
+    if (STATE.togetherCharactersLoaded) {
+      return Promise.resolve(STATE.togetherCharacters);
+    }
+    if (STATE.togetherCharactersLoading) {
+      return new Promise(function(resolve) {
+        var timer = setInterval(function() {
+          if (!STATE.togetherCharactersLoading) {
+            clearInterval(timer);
+            resolve(STATE.togetherCharacters);
+          }
+        }, 50);
+      });
+    }
+    if (!STATE.roche || !STATE.roche.character || !STATE.roche.character.list) {
+      return Promise.reject(new Error('当前 Roche 版本没有开放角色读取接口'));
+    }
+
+    STATE.togetherCharactersLoading = true;
+    return Promise.resolve(STATE.roche.character.list()).then(function(characters) {
+      STATE.togetherCharacters = Array.isArray(characters) ? characters : [];
+      STATE.togetherCharactersLoaded = true;
+      STATE.togetherCharactersLoading = false;
+
+      var selectedExists = STATE.togetherCharacters.some(function(character) {
+        return String(character.id) === String(STATE.togetherCharacterId);
+      });
+      if (!selectedExists && STATE.togetherCharacters.length > 0) {
+        STATE.togetherCharacterId = String(STATE.togetherCharacters[0].id);
+        saveSettings();
+      }
+      refreshTogetherView();
+      return STATE.togetherCharacters;
+    }).catch(function(error) {
+      STATE.togetherCharactersLoading = false;
+      console.error('[一起听] 加载角色失败', error);
+      throw error;
+    });
+  }
+
+  function getTogetherCharacter() {
+    return loadTogetherCharacters().then(function(characters) {
+      var summary = characters.find(function(character) {
+        return String(character.id) === String(STATE.togetherCharacterId);
+      });
+      if (!summary) throw new Error('请先选择一起听的 Char');
+
+      if (STATE.roche.character.get) {
+        return Promise.resolve(STATE.roche.character.get(summary.id)).then(function(fullCharacter) {
+          return fullCharacter || summary;
+        }).catch(function() {
+          return summary;
+        });
+      }
+      return summary;
+    });
+  }
+
+  function unlockTogetherAudio() {
+    if (!STATE.audio) initAudio();
+    if (STATE.audioUnlocked || STATE.isPlaying) {
+      STATE.audioUnlocked = true;
+      return Promise.resolve(true);
+    }
+    if (STATE.audioUnlocking && audioUnlockPromise) return audioUnlockPromise;
+
+    STATE.audioUnlocking = true;
+    var audio = STATE.audio;
+    var previousMuted = audio.muted;
+    audio.muted = true;
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+    audioUnlockPromise = Promise.resolve(audio.play()).then(function() {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = previousMuted;
+      STATE.audioUnlocked = true;
+      STATE.audioUnlocking = false;
+      return true;
+    }).catch(function(error) {
+      audio.muted = previousMuted;
+      STATE.audioUnlocking = false;
+      STATE.audioUnlocked = false;
+      console.error('[一起听] 音频授权失败', error);
+      throw new Error('音频授权失败，请再点一次开始按钮');
+    });
+    return audioUnlockPromise;
+  }
+
+  function extractDjChoice(result) {
+    var text = result && (result.text || result.message || result.content) || '';
+    if (typeof text !== 'string') text = String(text || '');
+    var cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    var match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        var parsed = JSON.parse(match[0]);
+        return {
+          query: String(parsed.query || parsed.song || '').trim(),
+          comment: String(parsed.comment || parsed.message || '').trim()
+        };
+      } catch (error) {
+        console.warn('[一起听] JSON 解析失败，使用文本降级', error);
+      }
+    }
+    return { query: cleaned.split(/\r?\n/)[0].trim(), comment: '' };
+  }
+
+  function loadTogetherAiContext(character) {
+    var userPromise = Promise.resolve(null);
+    var recentPromise = Promise.resolve([]);
+
+    if (STATE.roche.persona && STATE.roche.persona.getActiveUserPersona) {
+      userPromise = Promise.resolve(STATE.roche.persona.getActiveUserPersona()).catch(function() { return null; });
+    }
+    if (character.conversationId && STATE.roche.memory && STATE.roche.memory.getShortTerm) {
+      recentPromise = Promise.resolve(STATE.roche.memory.getShortTerm({
+        conversationId: character.conversationId,
+        limit: 12
+      })).catch(function() { return []; });
+    }
+
+    return Promise.all([userPromise, recentPromise]).then(function(values) {
+      return { user: values[0], recent: Array.isArray(values[1]) ? values[1] : [] };
+    });
+  }
+
+  function chooseSongWithCharacter(request, isAutoContinue) {
+    if (!STATE.togetherEnabled) return Promise.reject(new Error('一起听尚未开启'));
+    if (STATE.togetherChoosing) return Promise.reject(new Error('TA 正在选歌，请稍等'));
+    if (!STATE.roche || !STATE.roche.ai || !STATE.roche.ai.chat) {
+      return Promise.reject(new Error('当前 Roche 没有可用的 AI 聊天配置'));
+    }
+
+    STATE.togetherChoosing = true;
+    var requestId = ++STATE.togetherRequestId;
+    STATE.togetherStatus = 'thinking';
+    STATE.togetherMessage = isAutoContinue ? '上一首结束了，TA 正在挑下一首…' : 'TA 正在想和你听什么…';
+    refreshTogetherView();
+
+    var selectedCharacter = null;
+    var requestText = String(request || '').trim() || '选一首你现在最想和我一起听的歌';
+
+    return getTogetherCharacter().then(function(character) {
+      selectedCharacter = character;
+      return loadTogetherAiContext(character);
+    }).then(function(context) {
+      var charName = getCharacterDisplayName(selectedCharacter);
+      var userName = context.user && (context.user.handle || context.user.name) || '用户';
+      var recentText = context.recent.slice(-10).map(function(message) {
+        var sender = message.senderHandle || message.senderName || message.senderId || '对方';
+        return sender + '：' + String(message.text || '').slice(0, 180);
+      }).join('\n');
+      var currentText = STATE.currentSong
+        ? STATE.currentSong.name + ' - ' + STATE.currentSong.artist
+        : '暂无';
+
+      var systemPrompt = [
+        '你现在是角色“' + charName + '”，正在 Roche 音乐插件里和 ' + userName + ' 一起听歌。',
+        '角色设定：' + String(selectedCharacter.persona || selectedCharacter.bio || selectedCharacter.description || '自然地按自己的喜好选歌。').slice(0, 4000),
+        '请根据角色性格、用户请求和最近聊天氛围，亲自选择一首真实存在、适合在网易云音乐搜索的歌曲。',
+        '不要选择当前正在播放的同一首歌。只返回严格 JSON，不要 Markdown：',
+        '{"query":"歌曲名 歌手名","comment":"你对用户说的一句自然简短的话"}'
+      ].join('\n');
+
+      var userPrompt = [
+        '用户的听歌请求：' + requestText,
+        '当前歌曲：' + currentText,
+        recentText ? '最近聊天（仅作氛围参考）：\n' + recentText : ''
+      ].filter(Boolean).join('\n\n');
+
+      return STATE.roche.ai.chat({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.85,
+        stream: false
+      });
+    }).then(function(aiResult) {
+      if (!STATE.togetherEnabled || requestId !== STATE.togetherRequestId) {
+        var cancelled = new Error('一起听已结束');
+        cancelled.cancelled = true;
+        throw cancelled;
+      }
+      var choice = extractDjChoice(aiResult);
+      if (!choice.query) throw new Error('TA 没有给出可搜索的歌曲');
+
+      STATE.togetherStatus = 'searching';
+      STATE.togetherMessage = (choice.comment || '我找找这首。') + '  正在搜索「' + choice.query + '」';
+      refreshTogetherView();
+
+      return neteaseSearch(choice.query).then(function(searchResult) {
+        var songs = normalizeSearchSongs(searchResult);
+        if (songs.length === 0) throw new Error('网易云没有找到「' + choice.query + '」');
+
+        if (!STATE.togetherEnabled || requestId !== STATE.togetherRequestId) {
+          var cancelled = new Error('一起听已结束');
+          cancelled.cancelled = true;
+          throw cancelled;
+        }
+        if (STATE.currentSong && songs.length > 1) {
+          var differentSongs = songs.filter(function(song) { return String(song.id) !== String(STATE.currentSong.id); });
+          if (differentSongs.length > 0) songs = differentSongs;
+        }
+        var song = songs[0];
+        STATE.playlist = songs;
+        STATE.currentIndex = 0;
+        STATE.togetherMessage = getCharacterDisplayName(selectedCharacter) + '：' + (choice.comment || '这首想和你一起听。');
+
+        return playSong(song, false).then(function(playResult) {
+          if (playResult && playResult.ok === false) {
+            throw new Error(playResult.error || '歌曲播放失败');
+          }
+          STATE.togetherStatus = 'playing';
+          STATE.togetherChoosing = false;
+          saveSettings();
+          refreshTogetherView();
+          return {
+            song: song.name,
+            artist: song.artist,
+            character: getCharacterDisplayName(selectedCharacter)
+          };
+        });
+      });
+    }).catch(function(error) {
+      STATE.togetherChoosing = false;
+      if (error.cancelled) return Promise.reject(error);
+      STATE.togetherStatus = 'error';
+      STATE.togetherMessage = '没能选好这首：' + error.message;
+      console.error('[一起听] Char 选歌失败', error);
+      refreshTogetherView();
+      if (!isAutoContinue) {
+        showToast(STATE.togetherMessage);
+        error.alreadyNotified = true;
+      }
+      throw error;
+    });
+  }
+
+  function startTogetherListening(request) {
+    STATE.togetherEnabled = true;
+    STATE.togetherStatus = 'unlocking';
+    STATE.togetherMessage = '正在准备播放器…';
+    refreshTogetherView();
+
+    return unlockTogetherAudio().then(function() {
+      return chooseSongWithCharacter(request, false);
+    }).catch(function(error) {
+      if (error.cancelled) return Promise.reject(error);
+      STATE.togetherEnabled = false;
+      STATE.togetherChoosing = false;
+      STATE.togetherStatus = 'error';
+      STATE.togetherMessage = error.message;
+      refreshTogetherView();
+      if (!error.alreadyNotified) showToast(error.message);
+      throw error;
+    });
+  }
+
+  function stopTogetherListening() {
+    STATE.togetherRequestId += 1;
+    STATE.togetherEnabled = false;
+    STATE.togetherChoosing = false;
+    STATE.togetherStatus = 'idle';
+    STATE.togetherMessage = '一起听已结束，当前音乐会继续播放。';
+    refreshTogetherView();
+  }
   // ==================== 登录功能 ====================
 
   // 获取用户信息
@@ -1155,6 +1485,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     return wrapper;
   }
   function initAudio() {
+    if (STATE.audio) {
+      STATE.audio.volume = STATE.volume;
+      return;
+    }
     STATE.audio = new Audio();
     STATE.audio.volume = STATE.volume;
     STATE.audio.addEventListener('play', () => { STATE.isPlaying = true; updatePlayBtn(); });
@@ -1165,7 +1499,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       updateProgress();
     });
     STATE.audio.addEventListener('ended', function() {
-      if (STATE.playMode === 'single') {
+      if (STATE.audioUnlocking) return;
+      if (STATE.togetherEnabled && STATE.togetherAutoContinue) {
+        chooseSongWithCharacter('上一首已经结束了，请按你的心情再选一首不同的歌', true).catch(function() {});
+      } else if (STATE.playMode === 'single') {
         STATE.audio.currentTime = 0;
         STATE.audio.play();
       } else {
@@ -1180,40 +1517,26 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     STATE.lyric = [];
     STATE.activeLyricIdx = -1;
 
-    // 只在明确要求跳转时才跳转到播放器页面
     if (autoJumpToPlayer !== false) {
       STATE.currentView = 'player';
       createUI();
     }
 
-    // 更新灵动岛信息（如果存在）
-    if (GLOBAL_ISLAND) {
-      updateIslandInfo();
-    }
+    if (GLOBAL_ISLAND) updateIslandInfo();
 
-    // 获取歌词
     neteaseLyric(song.id).then(function(data) {
       console.log('[歌词响应]', data);
       STATE.lyric = parseLyric((data.lrc && data.lrc.lyric) || '');
       console.log('[歌词]', STATE.lyric.length + ' 行');
-      // 重新渲染播放器以显示歌词
-      if (STATE.currentView === 'player') {
-        createUI();
-      }
-      // 更新灵动岛歌词
-      if (GLOBAL_ISLAND) {
-        updateIslandLyric();
-      }
-    }).catch(function(e) {
-      console.error('[获取歌词失败]', e);
+      if (STATE.currentView === 'player') createUI();
+      if (GLOBAL_ISLAND) updateIslandLyric();
+    }).catch(function(error) {
+      console.error('[获取歌词失败]', error);
     });
 
-    // 获取播放地址
     console.log('[请求播放地址] ID:', song.id, 'Quality:', STATE.quality);
-    neteaseSongUrl(song.id).then(function(data) {
+    return neteaseSongUrl(song.id).then(function(data) {
       console.log('[播放地址响应]', data);
-
-      // 解析 URL - 多种可能的数据格式
       var url = null;
       if (data.data && Array.isArray(data.data) && data.data[0]) {
         url = data.data[0].url;
@@ -1224,40 +1547,37 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       }
 
       console.log('[解析URL]', url);
-
       if (!url) {
+        var unavailableMessage = '无法获取播放地址，可能是 VIP 歌曲或版权限制';
         console.error('[无播放地址] 完整响应:', JSON.stringify(data));
-        alert('无法获取播放地址，可能是VIP歌曲或版权限制');
-        return;
+        if (!STATE.togetherChoosing) alert(unavailableMessage);
+        return { ok: false, error: unavailableMessage };
       }
 
       url = toHttps(url);
       console.log('[最终URL]', url);
-
       STATE.audio.src = url;
-      STATE.audio.play().then(function() {
+      return STATE.audio.play().then(function() {
         console.log('[播放成功]');
         STATE.isPlaying = true;
-        // 保存播放状态
+        STATE.audioUnlocked = true;
         saveSettings();
-        // 重新渲染播放器以更新播放状态
-        if (STATE.currentView === 'player') {
-          createUI();
-        }
-        // 更新灵动岛播放按钮
-        if (GLOBAL_ISLAND) {
-          updateIslandPlayBtn();
-        }
-      }).catch(function(e) {
-        console.error('[播放失败]', e);
-        alert('播放失败：' + e.message);
+        if (STATE.currentView === 'player') createUI();
+        if (GLOBAL_ISLAND) updateIslandPlayBtn();
+        return { ok: true };
+      }).catch(function(error) {
+        console.error('[播放失败]', error);
+        var message = '播放失败：' + error.message;
+        if (!STATE.togetherChoosing) alert(message);
+        return { ok: false, error: message };
       });
-    }).catch(function(e) {
-      console.error('[获取播放地址失败]', e);
-      alert('获取播放地址失败：' + e.message);
+    }).catch(function(error) {
+      console.error('[获取播放地址失败]', error);
+      var message = '获取播放地址失败：' + error.message;
+      if (!STATE.togetherChoosing) alert(message);
+      return { ok: false, error: message };
     });
   }
-
   function playNext() {
     if (STATE.playlist.length === 0) return;
     if (STATE.playMode === 'shuffle') {
@@ -1621,6 +1941,162 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     });
   }
 
+  function createTogetherListeningCard() {
+    var card = document.createElement('div');
+    card.className = 'shizuku-glass-strong';
+    card.style.cssText = `
+      margin:16px 16px 0;padding:16px;border-radius:20px;position:relative;z-index:10;
+      box-shadow:0 8px 28px ${C.glow}12;
+    `;
+
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px';
+
+    var titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0';
+    titleBox.appendChild(waterDrop(7));
+    var title = document.createElement('div');
+    title.textContent = '和 TA 一起听';
+    title.style.cssText = `font-size:14px;font-weight:600;color:${C.text}`;
+    titleBox.appendChild(title);
+    header.appendChild(titleBox);
+
+    var status = document.createElement('div');
+    var statusText = STATE.togetherEnabled ? (STATE.togetherChoosing ? '选歌中' : '一起听中') : '未开启';
+    status.textContent = statusText;
+    status.style.cssText = `
+      flex-shrink:0;padding:3px 8px;border-radius:12px;font-size:9px;
+      color:${STATE.togetherEnabled ? C.primary : C.muted};
+      background:${STATE.togetherEnabled ? C.glow + '35' : 'rgba(255,255,255,0.35)'};
+      border:1px solid ${STATE.togetherEnabled ? C.glow + '55' : C.faint + '30'};
+    `;
+    header.appendChild(status);
+    card.appendChild(header);
+
+    var selectedCharacter = STATE.togetherCharacters.find(function(character) {
+      return String(character.id) === String(STATE.togetherCharacterId);
+    });
+
+    var characterRow = document.createElement('div');
+    characterRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px';
+
+    var avatar = document.createElement('img');
+    avatar.src = selectedCharacter && selectedCharacter.avatar || 'https://p1.music.126.net/y19E5SadGUmSR8SZxkrNtw==/109951163965029180.jpg';
+    avatar.style.cssText = `width:38px;height:38px;border-radius:12px;object-fit:cover;border:1px solid ${C.glow}50;flex-shrink:0`;
+    characterRow.appendChild(avatar);
+
+    var select = document.createElement('select');
+    select.style.cssText = `
+      flex:1;min-width:0;padding:9px 10px;border-radius:12px;border:1px solid ${C.faint}45;
+      background:rgba(255,255,255,0.62);color:${C.text};font-size:12px;
+    `;
+    if (STATE.togetherCharactersLoading || !STATE.togetherCharactersLoaded) {
+      var loadingOption = document.createElement('option');
+      loadingOption.textContent = '正在加载 Char…';
+      loadingOption.value = '';
+      select.appendChild(loadingOption);
+      select.disabled = true;
+    } else if (STATE.togetherCharacters.length === 0) {
+      var emptyOption = document.createElement('option');
+      emptyOption.textContent = '没有可用的 Char';
+      emptyOption.value = '';
+      select.appendChild(emptyOption);
+      select.disabled = true;
+    } else {
+      STATE.togetherCharacters.forEach(function(character) {
+        var option = document.createElement('option');
+        option.value = String(character.id);
+        option.textContent = getCharacterDisplayName(character);
+        option.selected = String(character.id) === String(STATE.togetherCharacterId);
+        select.appendChild(option);
+      });
+    }
+    if (STATE.togetherChoosing) select.disabled = true;
+    select.onchange = function() {
+      STATE.togetherCharacterId = select.value;
+      STATE.togetherMessage = '';
+      saveSettings();
+      createUI();
+    };
+    characterRow.appendChild(select);
+    card.appendChild(characterRow);
+
+    var requestInput = document.createElement('input');
+    requestInput.type = 'text';
+    requestInput.placeholder = '现在想听什么感觉的歌？';
+    requestInput.style.cssText = `
+      width:100%;padding:10px 12px;margin-bottom:10px;border-radius:12px;
+      border:1px solid ${C.faint}45;background:rgba(255,255,255,0.62);
+      color:${C.text};font-size:12px;box-sizing:border-box;
+    `;
+    card.appendChild(requestInput);
+
+    var actionRow = document.createElement('div');
+    actionRow.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+    var actionBtn = document.createElement('button');
+    actionBtn.className = 'shizuku-btn-hover';
+    actionBtn.textContent = STATE.togetherChoosing
+      ? 'TA 正在选歌…'
+      : (STATE.togetherEnabled ? '让 TA 换一首' : '开始一起听');
+    actionBtn.disabled = STATE.togetherChoosing || !STATE.togetherCharactersLoaded || STATE.togetherCharacters.length === 0;
+    actionBtn.style.cssText = `
+      flex:1;padding:10px 12px;border-radius:12px;border:none;cursor:${actionBtn.disabled ? 'default' : 'pointer'};
+      font-size:12px;color:white;background:linear-gradient(135deg, ${C.primary}, ${C.accent});
+      opacity:${actionBtn.disabled ? '0.55' : '1'};box-shadow:0 3px 15px ${C.primary}25;
+    `;
+    actionBtn.onclick = function() {
+      var request = requestInput.value.trim();
+      var action = STATE.togetherEnabled
+        ? chooseSongWithCharacter(request, false)
+        : startTogetherListening(request);
+      action.catch(function() {});
+    };
+    requestInput.onkeydown = function(event) {
+      if (event.key === 'Enter' && !actionBtn.disabled) actionBtn.click();
+    };
+    actionRow.appendChild(actionBtn);
+
+    if (STATE.togetherEnabled) {
+      var stopBtn = document.createElement('button');
+      stopBtn.textContent = '结束';
+      stopBtn.style.cssText = `
+        padding:10px 12px;border-radius:12px;border:1px solid ${C.faint}45;
+        background:rgba(255,255,255,0.45);color:${C.muted};font-size:12px;cursor:pointer;
+      `;
+      stopBtn.onclick = stopTogetherListening;
+      actionRow.appendChild(stopBtn);
+    }
+    card.appendChild(actionRow);
+
+    var autoRow = document.createElement('label');
+    autoRow.style.cssText = `display:flex;align-items:center;gap:8px;margin-top:11px;font-size:10px;color:${C.muted};cursor:pointer`;
+    var autoCheck = document.createElement('input');
+    autoCheck.type = 'checkbox';
+    autoCheck.checked = STATE.togetherAutoContinue;
+    autoCheck.style.cssText = `width:15px;height:15px;accent-color:${C.primary}`;
+    autoCheck.onchange = function() {
+      STATE.togetherAutoContinue = autoCheck.checked;
+      saveSettings();
+    };
+    autoRow.appendChild(autoCheck);
+    var autoLabel = document.createElement('span');
+    autoLabel.textContent = '播完由 TA 续播';
+    autoRow.appendChild(autoLabel);
+    card.appendChild(autoRow);
+
+    if (STATE.togetherMessage) {
+      var message = document.createElement('div');
+      message.textContent = STATE.togetherMessage;
+      message.style.cssText = `
+        margin-top:12px;padding:10px 12px;border-radius:12px;background:${C.glow}1f;
+        color:${C.primary};font-size:11px;line-height:1.55;border:1px solid ${C.glow}35;
+      `;
+      card.appendChild(message);
+    }
+
+    return card;
+  }
   // ==================== 用户主页 UI ====================
   function createProfileView() {
     var container = document.createElement('div');
@@ -1846,6 +2322,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     userCard.appendChild(logoutBtn);
 
     content.appendChild(userCard);
+
+    content.appendChild(createTogetherListeningCard());
 
     // Tab 切换 - 照抄 SullyOS
     var tabBar = document.createElement('div');
@@ -3888,7 +4366,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.13.1',
+      version: '3.22.0',
       icon: '🎵',
       apps: [{
         id: 'netease-music',
@@ -3902,6 +4380,10 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
           loadSettings().then(function() {
             initAudio();
             createUI();
+            loadTogetherCharacters().catch(function(error) {
+              console.warn('[一起听] 暂时无法读取 Char', error);
+              refreshTogetherView();
+            });
             // 初始化播放模式按钮
             if (STATE.appRefs.playModeBtn) {
               updatePlayModeBtn();
