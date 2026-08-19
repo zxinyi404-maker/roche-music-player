@@ -1,11 +1,11 @@
 {
   "id": "roche-music-player",
   "name": "网易云音乐",
-  "version": "3.23.3",
+  "version": "3.24.0",
   "description": "和 Char 一起听：角色选歌、自动播放与续播",
   "author": "Roche (Fork by zxinyi404-maker)",
   "icon": "🎵",
-  "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js?v=3.23.3",
+  "entry": "https://raw.githubusercontent.com/zxinyi404-maker/roche-music-player/master/music-player.js?v=3.24.0",
   "hash": "",
   "permissions": ["persona:read", "character:read", "memory:read", "ai:chat", "storage", "ui"]
 }
