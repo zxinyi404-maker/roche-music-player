@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.24.0-chat-dj-tool';
+  var BUILD_TIME = '2026-08-19-v3.25.0-island-visibility';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -40,6 +40,7 @@
     searchResults: [],
     roche: null,
     islandTopOffset: 50, // 灵动岛距离顶部的偏移量（px）
+    islandVisible: true, // 是否显示全局灵动岛
     // 登录状态
     qrPollTimer: null,
     currentView: 'profile', // 'profile' | 'search' | 'player' | 'playlist'
@@ -267,6 +268,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
               STATE.quality = parsed.quality || 'standard';
               STATE.backend = parsed.backend || 'https://sullymeow.ccwu.cc';
               STATE.islandTopOffset = parsed.islandTopOffset || 50;
+              STATE.islandVisible = parsed.islandVisible !== false;
               STATE.playMode = parsed.playMode || 'loop';
               STATE.togetherCharacterId = parsed.togetherCharacterId || '';
               STATE.togetherAutoContinue = parsed.togetherAutoContinue !== false;
@@ -309,6 +311,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       STATE.quality = data.quality || 'standard';
       STATE.backend = data.backend || 'https://sullymeow.ccwu.cc';
       STATE.islandTopOffset = data.islandTopOffset || 50;
+      STATE.islandVisible = data.islandVisible !== false;
       STATE.playMode = data.playMode || 'loop';
       STATE.togetherCharacterId = data.togetherCharacterId || '';
       STATE.togetherAutoContinue = data.togetherAutoContinue !== false;
@@ -336,6 +339,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
       quality: STATE.quality,
       backend: STATE.backend,
       islandTopOffset: STATE.islandTopOffset,
+      islandVisible: STATE.islandVisible,
       playMode: STATE.playMode,
       togetherCharacterId: STATE.togetherCharacterId,
       togetherAutoContinue: STATE.togetherAutoContinue,
@@ -3834,6 +3838,42 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
 
     content.appendChild(backendSection);
 
+    // 灵动岛显示设置
+    var islandVisibilitySection = document.createElement('div');
+    islandVisibilitySection.className = 'shizuku-glass';
+    islandVisibilitySection.style.cssText = 'padding:16px;border-radius:20px;margin-bottom:16px';
+
+    var islandVisibilityRow = document.createElement('div');
+    islandVisibilityRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px';
+
+    var islandVisibilityText = document.createElement('div');
+    var islandVisibilityTitle = document.createElement('div');
+    islandVisibilityTitle.textContent = '显示灵动岛';
+    islandVisibilityTitle.style.cssText = `font-size:13px;font-weight:600;color:${C.text};margin-bottom:5px`;
+    islandVisibilityText.appendChild(islandVisibilityTitle);
+    var islandVisibilityDesc = document.createElement('div');
+    islandVisibilityDesc.textContent = '隐藏后不会暂停音乐，之后可在这里重新打开';
+    islandVisibilityDesc.style.cssText = `font-size:10px;color:${C.muted};line-height:1.4`;
+    islandVisibilityText.appendChild(islandVisibilityDesc);
+
+    var islandVisibilityToggle = document.createElement('input');
+    islandVisibilityToggle.type = 'checkbox';
+    islandVisibilityToggle.checked = STATE.islandVisible;
+    islandVisibilityToggle.style.cssText = 'width:20px;height:20px;accent-color:' + C.primary + ';cursor:pointer;flex-shrink:0';
+    islandVisibilityToggle.onchange = function() {
+      STATE.islandVisible = islandVisibilityToggle.checked;
+      saveSettings();
+      if (STATE.islandVisible && STATE.currentSong && STATE.audio && !GLOBAL_ISLAND) {
+        createGlobalIsland();
+      } else if (!STATE.islandVisible) {
+        removeGlobalIsland();
+      }
+    };
+
+    islandVisibilityRow.appendChild(islandVisibilityText);
+    islandVisibilityRow.appendChild(islandVisibilityToggle);
+    islandVisibilitySection.appendChild(islandVisibilityRow);
+    content.appendChild(islandVisibilitySection);
     // 灵动岛高度设置
     var islandSection = document.createElement('div');
     islandSection.className = 'shizuku-glass';
@@ -4151,6 +4191,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
   var ISLAND_EXPANDED = false;
 
   function createGlobalIsland() {
+    if (!STATE.islandVisible) return;
     // 如果已存在，先移除
     if (GLOBAL_ISLAND) {
       document.body.removeChild(GLOBAL_ISLAND);
@@ -4281,9 +4322,8 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     closeBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 256 256" fill="white"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>`;
     closeBtn.onclick = function(e) {
       e.stopPropagation();
-      if (STATE.audio) {
-        STATE.audio.pause();
-      }
+      STATE.islandVisible = false;
+      saveSettings();
       removeGlobalIsland();
     };
     expandedControls.appendChild(closeBtn);
@@ -4481,7 +4521,7 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.24.0',
+      version: '3.25.0',
       icon: '🎵',
       // 注入当前听歌状态，并注册聊天点歌工具。
       chat: {
