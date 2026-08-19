@@ -4404,8 +4404,35 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.22.1',
+      version: '3.23.0',
       icon: '🎵',
+      // 只注入当前听歌状态，不注册工具、不额外请求模型。
+      chat: {
+        contextProvider: function(ctx) {
+          if (!STATE.togetherEnabled || !STATE.currentSong) return null;
+
+          var selectedCharacter = STATE.togetherCharacters.find(function(character) {
+            return String(character.id) === String(STATE.togetherCharacterId);
+          });
+          if (selectedCharacter && selectedCharacter.conversationId && ctx && ctx.conversationId &&
+              String(selectedCharacter.conversationId) !== String(ctx.conversationId)) {
+            return null;
+          }
+
+          var characterName = getCharacterDisplayName(selectedCharacter);
+          var song = STATE.currentSong;
+          var status = STATE.isPlaying ? '正在播放' : '已暂停';
+          var progress = STATE.duration ? formatTime(STATE.currentTime) + ' / ' + formatTime(STATE.duration) : formatTime(STATE.currentTime);
+          return [
+            '【一起听状态】',
+            '你和用户正在通过网易云音乐插件一起听歌。',
+            '当前由 ' + characterName + ' 选择：' + song.name + ' - ' + (song.artist || song.artists || '未知歌手'),
+            '播放状态：' + status + '（' + progress + '）',
+            STATE.togetherMessage ? '刚才的听歌互动：' + STATE.togetherMessage : '',
+            '请自然地记住这首歌并围绕它回应，不要声称自己能听到设备音频。'
+          ].filter(Boolean).join('\n');
+        }
+      },
       apps: [{
         id: 'netease-music',
         name: '网易云音乐',
