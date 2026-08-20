@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var BUILD_TIME = '2026-08-19-v3.25.0-island-visibility';
+  var BUILD_TIME = '2026-08-20-v3.26.0-safe-chat';
 
   // ==================== 色板 — 水滴 × 星空 ====================
   var C = {
@@ -4443,95 +4443,23 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
     }
   }
 
-  // 插件级初始化：不依赖音乐面板是否打开，让聊天工具能复用同一个播放器。
-  function initializePlugin(roche) {
-    if (roche) STATE.roche = roche;
-    if (!STATE.audio) initAudio();
-    if (!STATE.settingsPromise) {
-      STATE.settingsPromise = loadSettings().then(function() {
-        STATE.initialized = true;
-        return true;
-      }).catch(function(error) {
-        console.warn('[网易云音乐] 设置加载失败，继续使用默认配置', error);
-        STATE.initialized = true;
-        return false;
-      });
-    }
-    return STATE.settingsPromise;
-  }
-
-  function playSongFromChat(args) {
-    var songName = String((args && (args.song || args.query || args.title)) || '').trim();
-    var artist = String((args && args.artist) || '').trim();
-    if (!songName) return Promise.resolve({ success: false, code: 'missing_song', message: '没有提供歌曲名' });
-    if (!STATE.togetherEnabled) {
-      return Promise.resolve({ success: false, code: 'together_disabled', message: '请先在网易云插件里开启“和 TA 一起听”' });
-    }
-    if (!STATE.audioUnlocked) {
-      return Promise.resolve({ success: false, code: 'audio_locked', message: '请先在网易云插件里手动播放一次并完成音频授权' });
-    }
-    if (STATE.togetherChoosing) {
-      return Promise.resolve({ success: false, code: 'busy', message: '正在处理上一首点歌，请稍等' });
-    }
-
-    var keyword = artist ? songName + ' ' + artist : songName;
-    STATE.togetherChoosing = true;
-    STATE.togetherStatus = 'searching';
-    STATE.togetherMessage = '正在为你搜索「' + keyword + '」';
-    refreshTogetherView();
-
-    return neteaseSearch(keyword).then(function(response) {
-      var songs = normalizeSearchSongs(response);
-      if (!songs.length) throw new Error('网易云没有找到「' + keyword + '」');
-      var best = songs[0];
-      var wanted = songName.toLowerCase();
-      for (var i = 0; i < songs.length; i++) {
-        var candidate = songs[i];
-        var candidateName = String(candidate.name || '').toLowerCase();
-        var candidateArtist = String(candidate.artist || '').toLowerCase();
-        if (candidateName === wanted || (candidateName.indexOf(wanted) >= 0 && (!artist || candidateArtist.indexOf(artist.toLowerCase()) >= 0))) {
-          best = candidate;
-          break;
-        }
-      }
-      if (STATE.currentSong && String(best.id) === String(STATE.currentSong.id) && songs.length > 1) best = songs[1];
-      STATE.playlist = songs;
-      STATE.currentIndex = Math.max(0, songs.indexOf(best));
-      STATE.togetherSelectionSource = 'chat_tool';
-      STATE.togetherMessage = '这是你刚刚在聊天里点选的「' + best.name + '」';
-      return playSong(best, false, true).then(function(result) {
-        if (!result || result.ok === false) throw new Error(result && result.error || '歌曲播放失败');
-        STATE.togetherStatus = 'playing';
-        STATE.togetherChoosing = false;
-        saveSettings();
-        refreshTogetherView();
-        return { success: true, song: best.name, artist: best.artist, message: '已播放「' + best.name + '」' };
-      });
-    }).catch(function(error) {
-      STATE.togetherChoosing = false;
-      STATE.togetherStatus = 'error';
-      STATE.togetherMessage = '点歌失败：' + error.message;
-      refreshTogetherView();
-      console.error('[网易云] 聊天点歌失败', error);
-      return { success: false, code: 'playback_failed', message: error.message };
-    });
-  }
   // ==================== 导出 ====================
   if (typeof window !== 'undefined') {
     window.RochePlugin.register({
       id: 'roche-music-player',
       name: '网易云音乐',
-      version: '3.25.0',
+      version: '3.26.0',
       icon: '🎵',
-      // 注入当前听歌状态，并注册聊天点歌工具。
+      // 只注入当前听歌状态，不注册工具、不额外请求模型。
       chat: {
-        scope: { conversationTypes: ['direct', 'group'] },
-        promptOnly: 'When the user asks to change songs, play the next song, or play a specific song, you MUST call the play_song tool. Use song for the title and artist when known. If the user gives only a mood, choose a real song and call the tool. Wait for a successful tool result before claiming playback.',
         contextProvider: function(ctx) {
           if (!STATE.togetherEnabled || !STATE.currentSong) return null;
+
           var selectedCharacter = STATE.togetherCharacters.find(function(character) {
             return String(character.id) === String(STATE.togetherCharacterId);
           });
+          // 主聊天的 conversationId 可能与角色资料里的会话 ID 不同，不能用它过滤。
+          // 一起听开启后，状态应注入当前用户正在发送消息的这条聊天。
           var characterName = getCharacterDisplayName(selectedCharacter);
           var song = STATE.currentSong;
           var status = STATE.isPlaying ? '正在播放' : '已暂停';
@@ -4549,48 +4477,58 @@ input, textarea { font-size: 16px !important; } /* 防止 iOS 放大 */
               lyricWindow.push((lyricOffset === 0 ? '当前：' : lyricOffset < 0 ? '上一句：' : '下一句：') + String(lyricItem.text || '').slice(0, 120));
             }
           }
+          var lyricContext = lyricWindow.length > 0
+            ? '此刻歌词：\n' + lyricWindow.join('\n')
+            : '此刻歌词：暂无可用歌词';
           return [
-            '[Important: current together-listening state]',
-            'You and the user are listening to music together in the current chat.',
-            STATE.togetherSelectionSource === 'chat_tool'
-              ? 'You just called the play_song tool in this chat and started "' + song.name + '" - ' + (song.artist || song.artists || 'unknown artist') + '.'
-              : 'You selected and started "' + song.name + '" - ' + (song.artist || song.artists || 'unknown artist') + ' as ' + characterName + '.',
-            'Treat this as a song you chose to listen to together; do not attribute the choice to the user or plugin.',
-            'Playback: ' + status + ' (' + progress + ')',
-            lyricWindow.length ? 'Current lyric context:\n' + lyricWindow.join('\n') : '此刻歌词：暂无可用歌词',
-            STATE.togetherMessage ? 'Your note at selection time: ' + STATE.togetherMessage : '',
-            'Speak naturally in first person about this song or lyric context. Do not claim to hear the device audio and do not reproduce full lyrics.'
+            '【重要：当前一起听状态】',
+            '这是当前聊天的实时背景：你和用户正在一起听歌，不是插件界面里的独立对话。',
+            '这是你刚才亲自做出的动作：你作为 ' + characterName + '，已经为用户选中并让播放器开始播放「' + song.name + '」- ' + (song.artist || song.artists || '未知歌手') + '。',
+            '请将这首歌视为“我刚刚选来和你一起听的歌”，不要说成是用户自己随机播放或插件替你选择。',
+            '播放状态：' + status + '（' + progress + '）',
+            lyricContext,
+            STATE.togetherMessage ? '你当时对用户说的话：' + STATE.togetherMessage : '',
+            '请把这当作当前对话背景，自然地以第一人称谈起这首歌或此刻歌词；不要声称自己能听到设备音频，也不要复述整首歌词。'
           ].filter(Boolean).join('\n');
-        },
-        tools: [{
-          id: 'play_song',
-          description: 'Search and play a song for the user. Use for song changes, next-song requests, and explicit song requests.',
-          parameters: { song: 'string', artist: 'string' },
-          execute: function(args, ctx) { return playSongFromChat(args); }
-        }]
+        }
       },
       apps: [{
         id: 'netease-music',
         name: '网易云音乐',
         mount: function(container, roche) {
+          console.log('[网易云音乐播放器 Shizuku] 初始化', BUILD_TIME);
+          STATE.roche = roche;
           STATE.appContainer = container;
-          initializePlugin(roche).then(function() {
-            STATE.appContainer = container;
+
+          // 等待设置加载完成后再初始化
+          loadSettings().then(function() {
+            initAudio();
             createUI();
-            loadTogetherCharacters().catch(function(error) { console.warn('[together] Char unavailable', error); });
-            if (STATE.appRefs.playModeBtn) updatePlayModeBtn();
+            loadTogetherCharacters().catch(function(error) {
+              console.warn('[一起听] 暂时无法读取 Char', error);
+              refreshTogetherView();
+            });
+            // 初始化播放模式按钮
+            if (STATE.appRefs.playModeBtn) {
+              updatePlayModeBtn();
+            }
           });
         },
         unmount: function(container) {
-          if (STATE.currentSong && STATE.audio) createGlobalIsland();
-          if (STATE.appContainer === container) STATE.appContainer = null;
+          // 如果有正在播放的歌曲，显示全局灵动岛
+          if (STATE.currentSong && STATE.audio) {
+            createGlobalIsland();
+            // 不销毁 Audio 对象，让音乐继续播放
+          } else {
+            // 没有歌曲时才清理 Audio
+            if (STATE.audio) {
+              STATE.audio.pause();
+              STATE.audio = null;
+            }
+          }
           container.replaceChildren();
         }
-      }],
-      onLoad: function(roche) {
-        initializePlugin(roche).catch(function(error) { console.warn('[music] initialization failed', error); });
-      },
-      onUnload: function() {}
+      }]
     });
   }
 })();
